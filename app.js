@@ -7,6 +7,8 @@
 // -------------------------------------------------------------
 // 1. DATA INITIALIZATION: 25 INVENTORY ASSETS (LAYARASA)
 // -------------------------------------------------------------
+const WHATSAPP_NUMBER = '6283199103034';
+
 const INITIAL_INVENTORY = [
   // KAMERA (5 items)
   { id: 'CAM-01', name: 'Sony FX3 Cinema Line', category: 'Kamera', rate12h: 350000, rate24h: 550000, status: 'Available', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=400&q=80', desc: 'Full-frame Cinema Line 4K 120fps, Dual Base ISO 800/12800' },
@@ -460,7 +462,7 @@ class LayarasaApp {
       `*Total Biaya:* Rp ${o.totalPrice.toLocaleString('id-ID')}\n\n` +
       `Mohon siapkan peralatan saat saya datang ke lokasi. Terima kasih!`
     );
-    window.open(`https://wa.me/6281234567890?text=${msg}`, '_blank');
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
   }
 
   // -------------------------------------------------------------
