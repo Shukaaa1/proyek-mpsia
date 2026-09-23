@@ -95,7 +95,7 @@ export default function PickupModal() {
         id="modal-pickup"
         className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
       >
-        <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fade-in my-8 max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fade-in my-8 max-h-[90vh] overflow-y-auto modal-scrollable">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>

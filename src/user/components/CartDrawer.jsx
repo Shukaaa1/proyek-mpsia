@@ -28,43 +28,6 @@ export default function CartDrawer() {
 
   return (
     <>
-      {/* Floating Cart Button (Pojok Kanan Bawah) */}
-      {isCustomerView && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <button
-            type="button"
-            onClick={openCart}
-            className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-5 py-3 rounded-full shadow-2xl hover:shadow-brand-500/25 border border-slate-700 transition-all transform hover:-translate-y-0.5"
-            title="Buka Keranjang Sewa"
-          >
-            <div className="relative">
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {totalItems > 0 && (
-                <span className="absolute -top-2 -right-2 bg-amber-500 text-slate-950 font-black text-[11px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow">
-                  {totalItems}
-                </span>
-              )}
-            </div>
-
-            <div className="text-left">
-              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-amber-300">
-                Keranjang Sewa
-              </span>
-              <span className="text-xs font-black text-white">
-                {totalItems > 0 ? formatRupiah(totalPrice) : 'Kosong'}
-              </span>
-            </div>
-          </button>
-        </div>
-      )}
-
       {/* Slide-over Drawer / Modal */}
       {isCartOpen && (
         <div
@@ -102,7 +65,7 @@ export default function CartDrawer() {
             </div>
 
             {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 modal-scrollable">
               {totalItems === 0 ? (
                 <div className="text-center py-16 space-y-3">
                   <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center text-2xl">
