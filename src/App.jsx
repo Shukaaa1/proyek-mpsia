@@ -9,6 +9,8 @@ import CatalogPage from './user/pages/CatalogPage';
 import BookingPage from './user/pages/BookingPage';
 import OrderSuccessPage from './user/pages/OrderSuccessPage';
 import OnRentNoticeModal from './user/components/OnRentNoticeModal';
+import EquipmentDetailModal from './user/components/EquipmentDetailModal';
+import CartDrawer from './user/components/CartDrawer';
 
 // Admin Modules
 import AdminNavbar from './admin/components/AdminNavbar';
@@ -45,6 +47,8 @@ export default function App() {
       {!isAdminView && <UserFooter />}
       {activeView === 'admin' && <AdminFooter />}
       <OnRentNoticeModal />
+      <EquipmentDetailModal />
+      <CartDrawer />
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

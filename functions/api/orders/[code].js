@@ -22,7 +22,11 @@ export async function onRequestPatch(context) {
       handoverPhoto,
       handoverNotes,
       returnPhoto,
-      returnNotes
+      returnNotes,
+      lateFee,
+      otherFee,
+      otherFeeNotes,
+      totalSettlement
     } = body;
 
     // Ambil order yang ada
@@ -40,6 +44,10 @@ export async function onRequestPatch(context) {
     const updatedHandoverNotes = handoverNotes !== undefined ? handoverNotes : order.handoverNotes;
     const updatedReturnPhoto = returnPhoto !== undefined ? returnPhoto : order.returnPhoto;
     const updatedReturnNotes = returnNotes !== undefined ? returnNotes : order.returnNotes;
+    const updatedLateFee = lateFee !== undefined ? lateFee : (order.lateFee || 0);
+    const updatedOtherFee = otherFee !== undefined ? otherFee : (order.otherFee || 0);
+    const updatedOtherFeeNotes = otherFeeNotes !== undefined ? otherFeeNotes : order.otherFeeNotes;
+    const updatedTotalSettlement = totalSettlement !== undefined ? totalSettlement : order.totalSettlement;
     const newStatus = status || order.status;
 
     // Update order
@@ -47,7 +55,9 @@ export async function onRequestPatch(context) {
       UPDATE orders
       SET status = ?, handoverTime = ?, returnTime = ?,
           handoverPhoto = ?, handoverNotes = ?,
-          returnPhoto = ?, returnNotes = ?
+          returnPhoto = ?, returnNotes = ?,
+          lateFee = ?, otherFee = ?, otherFeeNotes = ?,
+          totalSettlement = ?
       WHERE code = ?
     `).bind(
       newStatus,
@@ -57,6 +67,10 @@ export async function onRequestPatch(context) {
       updatedHandoverNotes,
       updatedReturnPhoto,
       updatedReturnNotes,
+      updatedLateFee,
+      updatedOtherFee,
+      updatedOtherFeeNotes,
+      updatedTotalSettlement,
       orderCode
     );
 
@@ -87,7 +101,11 @@ export async function onRequestPatch(context) {
           handoverPhoto: updatedHandoverPhoto,
           handoverNotes: updatedHandoverNotes,
           returnPhoto: updatedReturnPhoto,
-          returnNotes: updatedReturnNotes
+          returnNotes: updatedReturnNotes,
+          lateFee: updatedLateFee,
+          otherFee: updatedOtherFee,
+          otherFeeNotes: updatedOtherFeeNotes,
+          totalSettlement: updatedTotalSettlement
         }
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

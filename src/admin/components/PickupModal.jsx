@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRental } from '../../context/RentalContext';
 import { compressImageFile } from '../../shared/utils/imageCompressor';
+import { formatRupiah, formatDateTime, calculateLateFee } from '../../shared/utils/formatters';
 
 export default function PickupModal() {
   const {
@@ -12,7 +13,8 @@ export default function PickupModal() {
     pickupVerifyResult,
     executePickupTransition,
     cancelOrDeleteOrder,
-    showToast
+    showToast,
+    inventory
   } = useRental();
 
   // Condition Checklist State
@@ -21,6 +23,10 @@ export default function PickupModal() {
   const [returnPhoto, setReturnPhoto] = useState(null);
   const [returnNotes, setReturnNotes] = useState('');
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  // Denda Lain-lain State (Poin 3b)
+  const [otherFee, setOtherFee] = useState(0);
+  const [otherFeeNotes, setOtherFeeNotes] = useState('');
 
   // Checklist verification checkboxes
   const [checkSensor, setCheckSensor] = useState(false);
@@ -41,6 +47,8 @@ export default function PickupModal() {
     setHandoverNotes('');
     setReturnPhoto(null);
     setReturnNotes('');
+    setOtherFee(0);
+    setOtherFeeNotes('');
     setCheckSensor(false);
     setCheckBody(false);
     setCheckAccessories(false);
@@ -382,50 +390,212 @@ export default function PickupModal() {
                             className="input py-1 text-xs w-full mt-1.5"
                           />
                         </div>
+
+                        {/* SECTION PENALTY: Denda Keterlambatan Otomatis (Poin 3a) */}
+                        {(() => {
+                          const currentInventoryItem = inventory?.find((i) => i.id === currentOrder.itemId);
+                          const rate24h = currentInventoryItem?.rate24h || currentOrder.totalPrice || 0;
+                          const lateFeeInfo = calculateLateFee(currentOrder.estimatedReturnTime, null, rate24h);
+
+                          return (
+                            <div className="space-y-3 pt-2 border-t border-blue-200">
+                              {/* Box Denda Keterlambatan */}
+                              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                    ⏱️ Status Keterlambatan &amp; Denda Otomatis:
+                                  </span>
+                                  {lateFeeInfo.isLate && !lateFeeInfo.isGracePeriod ? (
+                                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">
+                                      Terlambat {lateFeeInfo.lateHours}j {lateFeeInfo.lateMinutes}m
+                                    </span>
+                                  ) : lateFeeInfo.isGracePeriod ? (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                      Masa Toleransi (&lt; 1 Jam)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                      Tepat Waktu
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200 space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Jadwal Estimasi Selesai:</span>
+                                    <span className="font-mono font-semibold text-slate-800">
+                                      {formatDateTime(currentOrder.estimatedReturnTime)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Status &amp; Tarif Denda:</span>
+                                    <span className="font-semibold text-slate-700">{lateFeeInfo.desc}</span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-slate-100 pt-1">
+                                    <span className="text-slate-500 font-semibold">Nominal Denda Waktu:</span>
+                                    <span className="font-extrabold text-red-600">
+                                      {formatRupiah(lateFeeInfo.fee)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <p className="text-[10px] text-slate-400 leading-tight">
+                                  * Ketentuan WBS: 1–3 jam = 30% tarif 24 jam, 3–6 jam = 50% tarif harian, &gt;6 jam / berganti hari = 100% (1 hari sewa tambahan per 24 jam).
+                                </p>
+                              </div>
+
+                              {/* Box Denda Lain-lain / Kerusakan Manual (Poin 3b) */}
+                              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+                                <span className="font-bold text-slate-900 text-xs block">
+                                  🛠️ Denda Lain-lain / Kerusakan (Manual Sesuai Kesepakatan):
+                                </span>
+                                <div className="space-y-1.5">
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-700 block mb-0.5">
+                                      Nominal Denda Kerusakan/Lainnya (Rp):
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="5000"
+                                      placeholder="0 (jika tidak ada denda tambahan)"
+                                      value={otherFee || ''}
+                                      onChange={(e) => setOtherFee(Math.max(0, Number(e.target.value) || 0))}
+                                      className="input py-1 text-xs w-full font-mono font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-slate-700 block mb-0.5">
+                                      Catatan Kerusakan &amp; Kesepakatan Penggantian:
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      placeholder="Contoh: Baret lensa optik depan / penggantian elemen optik sesuai kesepakatan tertulis staf dan penyewa..."
+                                      value={otherFeeNotes}
+                                      onChange={(e) => setOtherFeeNotes(e.target.value)}
+                                      className="input py-1 text-xs w-full resize-none"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Ringkasan Total Pelunasan Akhir (Settlement) */}
+                              {(() => {
+                                const totalFinal = (currentOrder.totalPrice || 0) + (lateFeeInfo.fee || 0) + Number(otherFee || 0);
+                                return (
+                                  <div className="p-3 bg-slate-900 text-white rounded-xl space-y-1 text-xs">
+                                    <div className="flex justify-between text-slate-300 text-[11px]">
+                                      <span>Biaya Pokok Sewa:</span>
+                                      <span>{formatRupiah(currentOrder.totalPrice)}</span>
+                                    </div>
+                                    {lateFeeInfo.fee > 0 && (
+                                      <div className="flex justify-between text-amber-400 text-[11px]">
+                                        <span>Denda Keterlambatan:</span>
+                                        <span>+{formatRupiah(lateFeeInfo.fee)}</span>
+                                      </div>
+                                    )}
+                                    {otherFee > 0 && (
+                                      <div className="flex justify-between text-amber-400 text-[11px]">
+                                        <span>Denda Kerusakan / Lain-lain:</span>
+                                        <span>+{formatRupiah(otherFee)}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between font-extrabold text-sm border-t border-slate-700 pt-1.5 text-emerald-400">
+                                      <span>Total Pelunasan Wajib:</span>
+                                      <span>{formatRupiah(totalFinal)}</span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
 
                   {/* ========================================================
-                      KASUS 3: STATUS RETURNED (Arsip Riwayat Foto Lengkap)
+                      KASUS 3: STATUS RETURNED (Arsip Riwayat Foto & Denda)
                       ======================================================== */}
                   {currentOrder.status === 'Returned' && (
-                    <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-900 text-xs block">
-                        Arsip Bukti Pemeriksaan Fisik Lengkap:
-                      </span>
-                      <div className="grid grid-cols-2 gap-2 text-center">
-                        <div>
-                          <span className="text-[10px] text-slate-500 font-semibold block mb-1">Foto Serah-Terima</span>
-                          {currentOrder.handoverPhoto ? (
-                            <img
-                              src={currentOrder.handoverPhoto}
-                              alt="Handover"
-                              className="w-full h-20 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-90"
-                              onClick={() => setPreviewPhotoModal({ url: currentOrder.handoverPhoto, title: `Foto Serah-Terima - ${currentOrder.code}` })}
-                            />
-                          ) : (
-                            <span className="text-[11px] text-slate-400 italic">Tidak ada foto</span>
-                          )}
+                    <div className="space-y-3">
+                      {/* Rincian Pelunasan & Denda Tersimpan */}
+                      <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
+                        <span className="font-bold text-slate-900 block border-b border-slate-100 pb-1">
+                          Rincian Transaksi Selesai &amp; Catatan Denda:
+                        </span>
+                        <div className="flex justify-between text-slate-600">
+                          <span>Biaya Sewa Pokok:</span>
+                          <span className="font-semibold">{formatRupiah(currentOrder.totalPrice)}</span>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 font-semibold block mb-1">Foto Pengembalian</span>
-                          {currentOrder.returnPhoto ? (
-                            <img
-                              src={currentOrder.returnPhoto}
-                              alt="Return"
-                              className="w-full h-20 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-90"
-                              onClick={() => setPreviewPhotoModal({ url: currentOrder.returnPhoto, title: `Foto Pengembalian - ${currentOrder.code}` })}
-                            />
-                          ) : (
-                            <span className="text-[11px] text-slate-400 italic">Tidak ada foto</span>
-                          )}
+                        <div className="flex justify-between text-slate-600">
+                          <span>Denda Keterlambatan:</span>
+                          <span className="font-semibold text-red-600">
+                            {formatRupiah(currentOrder.lateFee || 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-600">
+                          <span>Denda Lain-lain / Kerusakan:</span>
+                          <span className="font-semibold text-red-600">
+                            {formatRupiah(currentOrder.otherFee || 0)}
+                          </span>
+                        </div>
+                        {currentOrder.otherFeeNotes && (
+                          <div className="p-2 bg-amber-50 rounded-lg text-[11px] text-amber-900 border border-amber-200">
+                            <strong>Catatan Kerusakan:</strong> {currentOrder.otherFeeNotes}
+                          </div>
+                        )}
+                        <div className="flex justify-between font-black text-slate-900 border-t border-slate-100 pt-1.5">
+                          <span>Total Akhir Pelunasan:</span>
+                          <span className="text-brand-600">
+                            {formatRupiah(
+                              currentOrder.totalSettlement ||
+                                (currentOrder.totalPrice || 0) +
+                                  (currentOrder.lateFee || 0) +
+                                  (currentOrder.otherFee || 0)
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Arsip Foto */}
+                      <div className="p-3 bg-slate-100 rounded-xl border border-slate-200 space-y-2">
+                        <span className="font-bold text-slate-900 text-xs block">
+                          Arsip Bukti Pemeriksaan Fisik:
+                        </span>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                          <div>
+                            <span className="text-[10px] text-slate-500 font-semibold block mb-1">Foto Serah-Terima</span>
+                            {currentOrder.handoverPhoto ? (
+                              <img
+                                src={currentOrder.handoverPhoto}
+                                alt="Handover"
+                                className="w-full h-20 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-90"
+                                onClick={() => setPreviewPhotoModal({ url: currentOrder.handoverPhoto, title: `Foto Serah-Terima - ${currentOrder.code}` })}
+                              />
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">Tidak ada foto</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 font-semibold block mb-1">Foto Pengembalian</span>
+                            {currentOrder.returnPhoto ? (
+                              <img
+                                src={currentOrder.returnPhoto}
+                                alt="Return"
+                                className="w-full h-20 object-cover rounded-lg border border-slate-300 cursor-pointer hover:opacity-90"
+                                onClick={() => setPreviewPhotoModal({ url: currentOrder.returnPhoto, title: `Foto Pengembalian - ${currentOrder.code}` })}
+                              />
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">Tidak ada foto</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Tombol Aksi Transisi dengan Proteksi Wajib Foto */}
+                  {/* Tombol Aksi Transisi dengan Proteksi Wajib Foto & Simpan Denda */}
                   <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-slate-200">
                     {/* Tombol Serahkan (On Rent) */}
                     <button
@@ -453,31 +623,46 @@ export default function PickupModal() {
                       {currentOrder.status === 'Booked' && !handoverPhoto ? '📷 Wajib Foto Fisik' : 'Serahkan (On Rent)'}
                     </button>
 
-                    {/* Tombol Kembalikan (Available) */}
-                    <button
-                      type="button"
-                      disabled={currentOrder.status !== 'On Rent' || !returnPhoto}
-                      onClick={() =>
-                        executePickupTransition(currentOrder.code, 'Returned', {
-                          returnPhoto,
-                          returnNotes
-                        })
-                      }
-                      className={`btn-secondary text-xs flex-1 justify-center ${
-                        currentOrder.status === 'On Rent' && returnPhoto
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-md'
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
-                      }`}
-                      title={
-                        currentOrder.status !== 'On Rent'
-                          ? 'Unit belum berstatus On Rent'
-                          : !returnPhoto
-                          ? 'Wajib unggah foto kondisi fisik pengembalian'
-                          : 'Selesaikan transaksi sewa'
-                      }
-                    >
-                      {currentOrder.status === 'On Rent' && !returnPhoto ? '📷 Wajib Foto Kembali' : 'Kembalikan (Available)'}
-                    </button>
+                    {/* Tombol Kembalikan (Available) dengan Kalkulasi Denda */}
+                    {(() => {
+                      const currentInventoryItem = inventory?.find((i) => i.id === currentOrder.itemId);
+                      const rate24h = currentInventoryItem?.rate24h || currentOrder.totalPrice || 0;
+                      const lateFeeInfo = calculateLateFee(currentOrder.estimatedReturnTime, null, rate24h);
+                      const totalFinal = (currentOrder.totalPrice || 0) + (lateFeeInfo.fee || 0) + Number(otherFee || 0);
+
+                      return (
+                        <button
+                          type="button"
+                          disabled={currentOrder.status !== 'On Rent' || !returnPhoto}
+                          onClick={() =>
+                            executePickupTransition(currentOrder.code, 'Returned', {
+                              returnPhoto,
+                              returnNotes,
+                              lateFee: lateFeeInfo.fee,
+                              otherFee,
+                              otherFeeNotes,
+                              totalSettlement: totalFinal
+                            })
+                          }
+                          className={`btn-secondary text-xs flex-1 justify-center ${
+                            currentOrder.status === 'On Rent' && returnPhoto
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-md'
+                              : 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                          }`}
+                          title={
+                            currentOrder.status !== 'On Rent'
+                              ? 'Unit belum berstatus On Rent'
+                              : !returnPhoto
+                              ? 'Wajib unggah foto kondisi fisik pengembalian'
+                              : 'Selesaikan transaksi sewa & catat pelunasan'
+                          }
+                        >
+                          {currentOrder.status === 'On Rent' && !returnPhoto
+                            ? '📷 Wajib Foto Kembali'
+                            : 'Kembalikan (Available)'}
+                        </button>
+                      );
+                    })()}
 
                     {/* Tombol Batalkan / Hapus */}
                     <button

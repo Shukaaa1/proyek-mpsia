@@ -3,7 +3,7 @@ import { useRental } from '../../context/RentalContext';
 import { formatRupiah, getStatusLabel, getStatusBadgeClass } from '../../shared/utils/formatters';
 
 export default function EquipmentCard({ item }) {
-  const { selectEquipmentForBooking, openOnRentModal } = useRental();
+  const { openEquipmentDetail } = useRental();
 
   const badgeClass = getStatusBadgeClass(item.status);
   const statusLabel = getStatusLabel(item.status);
@@ -13,31 +13,29 @@ export default function EquipmentCard({ item }) {
   const isBooked = item.status === 'Booked';
   const isAvailable = item.status === 'Available';
 
-  const handleButtonClick = () => {
-    if (isMaintenance) return;
-    if (isOnRent || isBooked) {
-      openOnRentModal(item);
-    } else {
-      selectEquipmentForBooking(item.id);
-    }
+  const handleCardClick = () => {
+    openEquipmentDetail(item);
   };
 
-  let btnLabel = 'Pesan Sekarang';
+  let btnLabel = 'Cek Jadwal & Sewa';
   let btnClasses = 'btn-primary w-full justify-center text-xs shadow-sm';
 
   if (isMaintenance) {
     btnLabel = 'Dalam Perawatan (Tidak Tersedia)';
     btnClasses = 'w-full justify-center text-xs py-2 px-3 rounded-xl bg-slate-100 text-slate-400 font-semibold border border-slate-200 cursor-not-allowed';
   } else if (isOnRent) {
-    btnLabel = 'Sedang Disewa (Hubungi Admin)';
+    btnLabel = 'Lihat Jadwal & Sewa (Aktif Disewa)';
     btnClasses = 'w-full justify-center text-xs py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition-all flex items-center justify-center gap-1.5 shadow-sm';
   } else if (isBooked) {
-    btnLabel = 'Terbooking (Hubungi Admin)';
+    btnLabel = 'Lihat Jadwal & Sewa (Terbooking)';
     btnClasses = 'w-full justify-center text-xs py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-900 font-bold border border-sky-300 transition-all flex items-center justify-center gap-1.5 shadow-sm';
   }
 
   return (
-    <div className="card overflow-hidden hover:shadow-lg transition-all border border-slate-200 flex flex-col justify-between group">
+    <div
+      onClick={handleCardClick}
+      className="card overflow-hidden hover:shadow-lg transition-all border border-slate-200 flex flex-col justify-between group cursor-pointer"
+    >
       <div>
         {/* Thumbnail & Status Badge */}
         <div className="relative h-44 overflow-hidden bg-slate-100">
@@ -85,7 +83,11 @@ export default function EquipmentCard({ item }) {
         </div>
 
         <button
-          onClick={handleButtonClick}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCardClick();
+          }}
           disabled={isMaintenance}
           className={btnClasses}
         >

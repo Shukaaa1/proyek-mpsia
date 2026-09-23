@@ -92,6 +92,11 @@ export async function onRequest(context) {
         handoverNotes TEXT,
         returnPhoto TEXT,
         returnNotes TEXT,
+        groupCode TEXT,
+        lateFee INTEGER DEFAULT 0,
+        otherFee INTEGER DEFAULT 0,
+        otherFeeNotes TEXT,
+        totalSettlement INTEGER,
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `).run();
@@ -102,7 +107,12 @@ export async function onRequest(context) {
       'ALTER TABLE orders ADD COLUMN handoverPhoto TEXT',
       'ALTER TABLE orders ADD COLUMN handoverNotes TEXT',
       'ALTER TABLE orders ADD COLUMN returnPhoto TEXT',
-      'ALTER TABLE orders ADD COLUMN returnNotes TEXT'
+      'ALTER TABLE orders ADD COLUMN returnNotes TEXT',
+      'ALTER TABLE orders ADD COLUMN groupCode TEXT',
+      'ALTER TABLE orders ADD COLUMN lateFee INTEGER DEFAULT 0',
+      'ALTER TABLE orders ADD COLUMN otherFee INTEGER DEFAULT 0',
+      'ALTER TABLE orders ADD COLUMN otherFeeNotes TEXT',
+      'ALTER TABLE orders ADD COLUMN totalSettlement INTEGER'
     ];
     for (const sql of columnsToEnsure) {
       try {

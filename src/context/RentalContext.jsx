@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVENTORY } from '../data/initialInventory';
 import { INITIAL_ORDERS, WHATSAPP_NUMBER } from '../data/initialOrders';
-import { calculateEstimatedReturn } from '../shared/utils/formatters';
+import { calculateEstimatedReturn, isTimeSlotOverlapping, calculateLateFee } from '../shared/utils/formatters';
 import {
   checkAndInitD1,
   fetchRemoteInventory,
@@ -97,6 +97,33 @@ export function RentalProvider({ children }) {
   const [dailyDays, setDailyDays] = useState(1);
   const [lastOrderResult, setLastOrderResult] = useState(null);
   const [hasDownloadedBookingCode, setHasDownloadedBookingCode] = useState(false);
+
+  // Equipment Detail Modal state (Rincian & Jadwal Ketersediaan Anti-Double Booking)
+  const [detailEquipmentItem, setDetailEquipmentItem] = useState(null);
+  const openEquipmentDetail = (item) => setDetailEquipmentItem(item);
+  const closeEquipmentDetail = () => setDetailEquipmentItem(null);
+
+  // Cart (Keranjang Sewa Multi-Alat) State
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem('layarasa_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const openCart = () => setIsCartOpen(true);
+  const closeCart = () => setIsCartOpen(false);
+
+  // Sync cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('layarasa_cart', JSON.stringify(cart));
+    } catch (e) {
+      console.warn('Gagal menyimpan cart ke localStorage:', e);
+    }
+  }, [cart]);
 
   // Toast Notification state
   const [toasts, setToasts] = useState([]);
@@ -310,6 +337,239 @@ export function RentalProvider({ children }) {
   // CSV Export Tracking for Safe History Deletion
   const [hasExportedCSV, setHasExportedCSV] = useState(false);
 
+  // Mengambil daftar interval booking aktif untuk suatu unit alat
+  const getItemBookedSlots = (itemId) => {
+    return orders
+      .filter((o) => o.itemId === itemId && (o.status === 'Booked' || o.status === 'On Rent'))
+      .map((o) => ({
+        code: o.code,
+        customerName: o.customerName,
+        status: o.status,
+        start: o.datePickup,
+        end: o.estimatedReturnTime
+      }));
+  };
+
+  // Validasi apakah requested interval bertabrakan dengan jadwal aktif unit (Anti-Double Booking)
+  const checkEquipmentAvailability = (itemId, requestedPickup, durationHours = 24) => {
+    if (!itemId || !requestedPickup) return { available: true, clashingSlot: null };
+    const slots = getItemBookedSlots(itemId);
+    if (slots.length === 0) return { available: true, clashingSlot: null };
+
+    const requestedEnd = calculateEstimatedReturn(requestedPickup, durationHours);
+    for (const slot of slots) {
+      if (isTimeSlotOverlapping(requestedPickup, requestedEnd, slot.start, slot.end)) {
+        return { available: false, clashingSlot: slot };
+      }
+    }
+    return { available: true, clashingSlot: null };
+  };
+
+  // Cart (Keranjang Sewa) Operations
+  const addToCart = (item, schedule = {}) => {
+    if (!item) return false;
+    const pkg = schedule.packageType || '24h';
+    const days = schedule.dailyDays || 1;
+    let durationBlock = 24;
+    let durationText = 'Blok 24 Jam (1 Hari)';
+    let itemPrice = item.rate24h;
+
+    if (pkg === '12h') {
+      durationBlock = 12;
+      durationText = 'Blok 12 Jam';
+      itemPrice = item.rate12h;
+    } else if (pkg === 'daily') {
+      durationBlock = days * 24;
+      durationText = `${days} Hari (${days * 24} Jam)`;
+      itemPrice = item.rate24h * days;
+    }
+
+    let pickup = schedule.datePickup;
+    if (!pickup) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      pickup = now.toISOString().slice(0, 16);
+    }
+    const estimatedReturnTime = calculateEstimatedReturn(pickup, durationBlock);
+
+    // Cek anti-double booking untuk rentang waktu ini
+    const availability = checkEquipmentAvailability(item.id, pickup, durationBlock);
+    if (!availability.available) {
+      showToast(
+        `Jadwal bentrok! ${item.name} sudah terpakai pada rentang ${availability.clashingSlot.start.replace('T', ' ')} s/d ${availability.clashingSlot.end}.`,
+        'error'
+      );
+      return false;
+    }
+
+    const newItem = {
+      cartItemId: `${item.id}-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      itemId: item.id,
+      name: item.name,
+      category: item.category,
+      image: item.image,
+      rate12h: item.rate12h,
+      rate24h: item.rate24h,
+      packageType: pkg,
+      dailyDays: days,
+      datePickup: pickup,
+      durationBlock,
+      durationText,
+      estimatedReturnTime,
+      itemPrice
+    };
+
+    setCart((prev) => [...prev, newItem]);
+    showToast(`${item.name} berhasil ditambahkan ke keranjang sewa!`, 'success');
+    return true;
+  };
+
+  const removeFromCart = (cartItemId) => {
+    setCart((prev) => prev.filter((i) => i.cartItemId !== cartItemId));
+    showToast('Alat berhasil dihapus dari keranjang.', 'info');
+  };
+
+  const updateCartItemSchedule = (cartItemId, updates) => {
+    setCart((prev) =>
+      prev.map((c) => {
+        if (c.cartItemId !== cartItemId) return c;
+        const pkg = updates.packageType !== undefined ? updates.packageType : c.packageType;
+        const days = updates.dailyDays !== undefined ? updates.dailyDays : c.dailyDays;
+        const pickup = updates.datePickup !== undefined ? updates.datePickup : c.datePickup;
+
+        let durationBlock = 24;
+        let durationText = 'Blok 24 Jam (1 Hari)';
+        let itemPrice = c.rate24h;
+
+        if (pkg === '12h') {
+          durationBlock = 12;
+          durationText = 'Blok 12 Jam';
+          itemPrice = c.rate12h;
+        } else if (pkg === 'daily') {
+          durationBlock = days * 24;
+          durationText = `${days} Hari (${days * 24} Jam)`;
+          itemPrice = c.rate24h * days;
+        }
+
+        const estimatedReturnTime = calculateEstimatedReturn(pickup, durationBlock);
+        return {
+          ...c,
+          packageType: pkg,
+          dailyDays: days,
+          datePickup: pickup,
+          durationBlock,
+          durationText,
+          estimatedReturnTime,
+          itemPrice
+        };
+      })
+    );
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  // Checkout semua alat yang ada di keranjang sewa
+  const checkoutCart = ({ customerName, phone, institution, paymentMethod, paymentProof = null }) => {
+    if (cart.length === 0) {
+      showToast('Keranjang sewa Anda masih kosong.', 'error');
+      return false;
+    }
+
+    if (!customerName || !phone || !institution) {
+      showToast('Lengkapi seluruh data penyewa.', 'error');
+      return false;
+    }
+
+    // Validasi anti-double booking untuk setiap item sebelum final submit
+    for (const item of cart) {
+      const avail = checkEquipmentAvailability(item.itemId, item.datePickup, item.durationBlock);
+      if (!avail.available) {
+        showToast(
+          `Jadwal bentrok untuk alat ${item.name}! Silakan periksa kembali jadwal di keranjang.`,
+          'error'
+        );
+        return false;
+      }
+    }
+
+    const groupHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const groupCode = `LAYA-GRP-${groupHex}`;
+    const newOrders = [];
+
+    cart.forEach((cartItem) => {
+      const orderHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const code = `LAYA-2026-${orderHex}`;
+
+      const orderObj = {
+        code,
+        groupCode,
+        customerName,
+        phone,
+        institution,
+        itemId: cartItem.itemId,
+        itemName: cartItem.name,
+        packageType: cartItem.packageType,
+        durationDays: cartItem.packageType === 'daily' ? cartItem.dailyDays : (cartItem.packageType === '24h' ? 1 : 0.5),
+        durationBlock: cartItem.durationBlock,
+        durationText: cartItem.durationText,
+        totalPrice: cartItem.itemPrice,
+        paymentMethod: paymentMethod || 'qris',
+        status: 'Booked',
+        datePickup: cartItem.datePickup,
+        estimatedReturnTime: cartItem.estimatedReturnTime,
+        handoverTime: null,
+        returnTime: null,
+        guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)',
+        paymentProof: paymentProof || null,
+        handoverPhoto: null,
+        handoverNotes: null,
+        returnPhoto: null,
+        returnNotes: null,
+        lateFee: 0,
+        otherFee: 0,
+        otherFeeNotes: null,
+        totalSettlement: cartItem.itemPrice
+      };
+
+      newOrders.push(orderObj);
+      createRemoteOrder(orderObj);
+    });
+
+    // Update orders state
+    setOrders((prev) => [...newOrders, ...prev]);
+
+    // Two-way synchronization: update inventory items status to Booked
+    const bookedIds = cart.map((c) => c.itemId);
+    setInventory((prev) =>
+      prev.map((item) =>
+        bookedIds.includes(item.id) && item.status !== 'Maintenance'
+          ? { ...item, status: 'Booked' }
+          : item
+      )
+    );
+
+    // Save result for ticket
+    const primaryOrder = {
+      ...newOrders[0],
+      code: newOrders.length > 1 ? groupCode : newOrders[0].code,
+      isGroup: newOrders.length > 1,
+      groupItems: newOrders,
+      totalPrice: newOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    };
+    setLastOrderResult(primaryOrder);
+    clearCart();
+    setHasDownloadedBookingCode(false);
+    setActiveView('success');
+    try {
+      window.location.hash = 'success';
+    } catch {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast(`Pemesanan ${newOrders.length} alat berhasil dicatat! Kode: ${primaryOrder.code}`, 'success');
+    return true;
+  };
+
   // Create Order with Estimated Completion & Two-way Inventory Sync
   const createOrder = ({ customerName, phone, institution, datePickup, paymentMethod, paymentProof = null }) => {
     if (!selectedEquipment) {
@@ -423,6 +683,27 @@ export function RentalProvider({ children }) {
     const estReturnStr = o.estimatedReturnTime || '-';
     const formattedPrice = `Rp ${Number(o.totalPrice || 0).toLocaleString('id-ID')}`;
 
+    let itemsSection = '';
+    if (o.isGroup && o.groupItems) {
+      itemsSection = o.groupItems
+        .map(
+          (gi, idx) =>
+            `ALAT #${idx + 1}           : [${gi.itemId}] ${gi.itemName}\n` +
+            `Paket Durasi Sewa   : ${gi.durationText}\n` +
+            `Jadwal Pengambilan  : ${gi.datePickup ? gi.datePickup.replace('T', ' ') : '-'} WIB\n` +
+            `Estimasi Selesai    : ${gi.estimatedReturnTime || '-'}\n` +
+            `Biaya Sewa Unit     : Rp ${Number(gi.totalPrice || 0).toLocaleString('id-ID')}\n`
+        )
+        .join('----------------------------------------------------------------\n');
+    } else {
+      itemsSection =
+        `Kode Aset           : ${o.itemId}\n` +
+        `Nama Peralatan      : ${o.itemName}\n` +
+        `Paket Durasi Sewa   : ${durasi}\n` +
+        `Jadwal Pengambilan  : ${datePickupStr} WIB\n` +
+        `Estimasi Selesai    : ${estReturnStr}\n`;
+    }
+
     const ticketContent = `================================================================
            LAYARASA RENTAL SINEMATOGRAFI & MULTIMEDIA
                 BUKTI RESMI TIKET & KODE BOOKING UNIK
@@ -437,11 +718,7 @@ Nomor WhatsApp      : ${o.phone}
 Instansi / Kampus   : ${o.institution || '-'}
 ----------------------------------------------------------------
 RINCIAN ALAT & OPERASIONAL:
-Kode Aset           : ${o.itemId}
-Nama Peralatan      : ${o.itemName}
-Paket Durasi Sewa   : ${durasi}
-Jadwal Pengambilan  : ${datePickupStr} WIB
-Estimasi Selesai    : ${estReturnStr}
+${itemsSection}----------------------------------------------------------------
 Metode Pembayaran   : ${(o.paymentMethod || 'QRIS').toUpperCase()}
 Total Biaya Sewa    : ${formattedPrice}
 ----------------------------------------------------------------
@@ -450,7 +727,10 @@ SYARAT & KETENTUAN PENGAMBILAN UNIT DI LOKASI:
 2. WAJIB menyerahkan FISIK KTP atau KTM Asli sebagai jaminan legal.
 3. Lakukan pengecekan fisik fungsi sensor, optik, baterai, dan bodi 
    bersama staf sebelum serah-terima unit (handover).
-4. Keterlambatan pengembalian tanpa konfirmasi dikenakan denda per jam.
+4. Keterlambatan pengembalian dikenakan denda sesuai regulasi WBS:
+   - 1 s/d 3 jam: 30% tarif sewa 24 jam
+   - 3 s/d 6 jam: 50% tarif harian
+   - > 6 jam / berganti hari: 100% penuh per hari tambahan.
 ----------------------------------------------------------------
 KONTAK & LOKASI STUDIO:
 WhatsApp Hotline    : +62 831-9910-3034
@@ -495,7 +775,11 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       'Timestamp Penyerahan (Serah-Terima)',
       'Timestamp Pengembalian',
       'Metode Pembayaran',
-      'Total Biaya (Rp)',
+      'Biaya Sewa Pokok (Rp)',
+      'Denda Keterlambatan (Rp)',
+      'Denda Lain-lain (Rp)',
+      'Catatan Denda',
+      'Total Akhir Pelunasan (Rp)',
       'Status Progres',
       'Jaminan Fisik'
     ];
@@ -513,6 +797,7 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       const handover = o.handoverTime ? o.handoverTime.replace('T', ' ') : '-';
       const returned = o.returnTime ? o.returnTime.replace('T', ' ') : '-';
       const progress = o.status === 'Returned' ? 'Selesai' : (o.status === 'On Rent' ? 'Sedang Disewa (Proses)' : 'Menunggu Serah-Terima');
+      const totalFinal = o.totalSettlement || ((o.totalPrice || 0) + (o.lateFee || 0) + (o.otherFee || 0));
 
       return [
         `"${dateFormatted}"`,
@@ -528,6 +813,10 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
         `"${returned}"`,
         `"${methodLabel}"`,
         o.totalPrice || 0,
+        o.lateFee || 0,
+        o.otherFee || 0,
+        `"${(o.otherFeeNotes || '-').replace(/"/g, '""')}"`,
+        totalFinal,
         `"${progress}"`,
         `"${o.guaranteeType || 'KTP/KTM Asli di Lokasi'}"`
       ].join(',');
@@ -657,6 +946,10 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
     let updatedHandoverNotes = order.handoverNotes || null;
     let updatedReturnPhoto = order.returnPhoto || null;
     let updatedReturnNotes = order.returnNotes || null;
+    let updatedLateFee = order.lateFee || 0;
+    let updatedOtherFee = order.otherFee || 0;
+    let updatedOtherFeeNotes = order.otherFeeNotes || null;
+    let updatedTotalSettlement = order.totalSettlement || order.totalPrice;
 
     if (newOrderStatus === 'On Rent') {
       updatedHandover = updatedHandover || nowISO;
@@ -666,9 +959,13 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       updatedReturn = updatedReturn || nowISO;
       if (transitionData.returnPhoto) updatedReturnPhoto = transitionData.returnPhoto;
       if (transitionData.returnNotes) updatedReturnNotes = transitionData.returnNotes;
+      if (transitionData.lateFee !== undefined) updatedLateFee = Number(transitionData.lateFee) || 0;
+      if (transitionData.otherFee !== undefined) updatedOtherFee = Number(transitionData.otherFee) || 0;
+      if (transitionData.otherFeeNotes !== undefined) updatedOtherFeeNotes = transitionData.otherFeeNotes;
+      updatedTotalSettlement = (order.totalPrice || 0) + updatedLateFee + updatedOtherFee;
     }
 
-    // Update order status & timestamps & condition photos
+    // Update order status & timestamps & condition photos & penalties
     setOrders((prev) =>
       prev.map((o) =>
         o.code === orderCode
@@ -680,7 +977,11 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
               handoverPhoto: updatedHandoverPhoto,
               handoverNotes: updatedHandoverNotes,
               returnPhoto: updatedReturnPhoto,
-              returnNotes: updatedReturnNotes
+              returnNotes: updatedReturnNotes,
+              lateFee: updatedLateFee,
+              otherFee: updatedOtherFee,
+              otherFeeNotes: updatedOtherFeeNotes,
+              totalSettlement: updatedTotalSettlement
             }
           : o
       )
@@ -702,7 +1003,11 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       handoverPhoto: updatedHandoverPhoto,
       handoverNotes: updatedHandoverNotes,
       returnPhoto: updatedReturnPhoto,
-      returnNotes: updatedReturnNotes
+      returnNotes: updatedReturnNotes,
+      lateFee: updatedLateFee,
+      otherFee: updatedOtherFee,
+      otherFeeNotes: updatedOtherFeeNotes,
+      totalSettlement: updatedTotalSettlement
     });
 
     closePickupModal();
@@ -803,7 +1108,24 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
         openOnRentModal,
         closeOnRentModal,
         d1Status,
-        refreshFromD1
+        refreshFromD1,
+        // Keranjang Sewa (Cart) Multi-Alat
+        cart,
+        isCartOpen,
+        openCart,
+        closeCart,
+        addToCart,
+        removeFromCart,
+        updateCartItemSchedule,
+        clearCart,
+        checkoutCart,
+        // Anti-Double Booking & Ketersediaan
+        getItemBookedSlots,
+        checkEquipmentAvailability,
+        // Equipment Detail Modal
+        detailEquipmentItem,
+        openEquipmentDetail,
+        closeEquipmentDetail
       }}
     >
       {children}

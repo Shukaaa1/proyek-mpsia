@@ -63,7 +63,12 @@ export async function onRequestPost(context) {
       handoverPhoto = null,
       handoverNotes = null,
       returnPhoto = null,
-      returnNotes = null
+      returnNotes = null,
+      groupCode = null,
+      lateFee = 0,
+      otherFee = 0,
+      otherFeeNotes = null,
+      totalSettlement = null
     } = body;
 
     if (!code || !customerName || !itemId) {
@@ -80,8 +85,9 @@ export async function onRequestPost(context) {
         packageType, durationDays, durationBlock, durationText, totalPrice,
         paymentMethod, status, datePickup, estimatedReturnTime, handoverTime,
         returnTime, guaranteeType, paymentProof, handoverPhoto, handoverNotes,
-        returnPhoto, returnNotes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        returnPhoto, returnNotes, groupCode, lateFee, otherFee, otherFeeNotes,
+        totalSettlement
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       code,
       customerName,
@@ -105,7 +111,12 @@ export async function onRequestPost(context) {
       handoverPhoto,
       handoverNotes,
       returnPhoto,
-      returnNotes
+      returnNotes,
+      groupCode || null,
+      lateFee || 0,
+      otherFee || 0,
+      otherFeeNotes || null,
+      totalSettlement || totalPrice
     );
 
     const updateInventory = env.DB.prepare(

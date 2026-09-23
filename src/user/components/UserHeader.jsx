@@ -3,10 +3,11 @@ import { useRental } from '../../context/RentalContext';
 import logoImg from '../../images/logo.jpg';
 
 export default function UserHeader() {
-  const { activeView, switchView, selectedEquipment } = useRental();
+  const { activeView, switchView, selectedEquipment, cart, openCart } = useRental();
 
   const isCatalogActive = activeView === 'catalog';
   const isBookingActive = activeView === 'booking' || activeView === 'success';
+  const totalCartCount = (cart?.length || 0) + (selectedEquipment && !cart?.length ? 1 : 0);
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
@@ -43,19 +44,31 @@ export default function UserHeader() {
             Katalog Alat (25)
           </button>
           <button
+            id="nav-btn-cart"
+            onClick={openCart}
+            className="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-200/60 transition-all flex items-center gap-1.5"
+          >
+            <span>🛒 Keranjang</span>
+            {cart && cart.length > 0 && (
+              <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                {cart.length}
+              </span>
+            )}
+          </button>
+          <button
             id="nav-btn-booking"
             onClick={() => switchView('booking')}
             className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all relative ${
               isBookingActive ? 'nav-tab-active' : 'nav-tab-inactive'
             }`}
           >
-            Pemesanan Saya
-            {selectedEquipment && (
+            Formulir Sewa
+            {totalCartCount > 0 && (
               <span
                 id="cart-badge"
-                className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center"
+                className="absolute -top-1 -right-1 bg-brand-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center"
               >
-                1
+                {totalCartCount}
               </span>
             )}
           </button>

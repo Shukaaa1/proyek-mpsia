@@ -355,9 +355,31 @@ export default function OrdersTable() {
                       )}
                     </td>
 
-                    {/* Total Biaya */}
+                    {/* Total Biaya & Denda */}
                     <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
-                      {formatRupiah(o.totalPrice)}
+                      {o.lateFee || o.otherFee ? (
+                        <div>
+                          <span className="block text-slate-900 font-extrabold text-xs">
+                            {formatRupiah(
+                              o.totalSettlement ||
+                                (o.totalPrice || 0) + (o.lateFee || 0) + (o.otherFee || 0)
+                            )}
+                          </span>
+                          <span className="block text-[10px] text-red-600 font-medium">
+                            + Denda: {formatRupiah((o.lateFee || 0) + (o.otherFee || 0))}
+                          </span>
+                          {o.otherFeeNotes && (
+                            <span
+                              className="block text-[9px] text-slate-400 italic truncate max-w-[140px]"
+                              title={o.otherFeeNotes}
+                            >
+                              Catatan: {o.otherFeeNotes}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span>{formatRupiah(o.totalPrice)}</span>
+                      )}
                     </td>
 
                     {/* Progres Transaksi */}

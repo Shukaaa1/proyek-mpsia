@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRental } from '../../context/RentalContext';
-import { formatRupiah, calculateEstimatedReturn } from '../../shared/utils/formatters';
+import { formatRupiah, calculateEstimatedReturn, formatDateTime } from '../../shared/utils/formatters';
 import { compressImageFile } from '../../shared/utils/imageCompressor';
 
 export default function BookingPage() {
@@ -13,7 +13,10 @@ export default function BookingPage() {
     createOrder,
     switchView,
     showToast,
-    openOnRentModal
+    openOnRentModal,
+    cart,
+    checkoutCart,
+    removeFromCart
   } = useRental();
 
   // Form state
@@ -35,13 +38,18 @@ export default function BookingPage() {
     setDatePickup(now.toISOString().slice(0, 16));
   }, []);
 
+  // Multi-item cart vs single equipment
+  const isCartBooking = cart && cart.length > 0;
+
   // Price & Duration calculations
   let basePrice = 0;
   let totalPrice = 0;
   let durationText = '';
   let durationHours = 24;
 
-  if (selectedEquipment) {
+  if (isCartBooking) {
+    totalPrice = cart.reduce((sum, item) => sum + (item.itemPrice || 0), 0);
+  } else if (selectedEquipment) {
     if (selectedPackage === '12h') {
       basePrice = selectedEquipment.rate12h;
       totalPrice = selectedEquipment.rate12h;
@@ -101,20 +109,42 @@ export default function BookingPage() {
       return;
     }
 
-    const success = createOrder({
-      customerName,
-      phone,
-      institution,
-      datePickup,
-      paymentMethod,
-      paymentProof: paymentMethod === 'cash' ? null : paymentProof
-    });
+    if (isCartBooking) {
+      const success = checkoutCart({
+        customerName,
+        phone,
+        institution,
+        paymentMethod,
+        paymentProof: paymentMethod === 'cash' ? null : paymentProof
+      });
 
-    if (success) {
-      setCustomerName('');
-      setPhone('');
-      setInstitution('');
-      setPaymentProof(null);
+      if (success) {
+        setCustomerName('');
+        setPhone('');
+        setInstitution('');
+        setPaymentProof(null);
+      }
+    } else {
+      if (!selectedEquipment) {
+        showToast('Silakan pilih alat dari katalog terlebih dahulu.', 'error');
+        return;
+      }
+
+      const success = createOrder({
+        customerName,
+        phone,
+        institution,
+        datePickup,
+        paymentMethod,
+        paymentProof: paymentMethod === 'cash' ? null : paymentProof
+      });
+
+      if (success) {
+        setCustomerName('');
+        setPhone('');
+        setInstitution('');
+        setPaymentProof(null);
+      }
     }
   };
 
@@ -149,147 +179,227 @@ export default function BookingPage() {
         {/* Summary Item Selected (Col 1) */}
         <div className="md:col-span-1 space-y-4">
           <div className="card p-5 space-y-4">
-            <h3 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">
-              Item Yang Dipilih
-            </h3>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="font-bold text-slate-900 text-sm">
+                {isCartBooking ? `Alat di Keranjang (${cart.length})` : 'Item Yang Dipilih'}
+              </h3>
+              {isCartBooking && (
+                <button
+                  type="button"
+                  onClick={() => switchView('catalog')}
+                  className="text-[11px] font-bold text-brand-600 hover:underline"
+                >
+                  + Tambah Alat
+                </button>
+              )}
+            </div>
 
-            {selectedEquipment ? (
-              <div id="booking-item-card" className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={selectedEquipment.image}
-                    alt={selectedEquipment.name}
-                    className="w-14 h-14 rounded-xl object-cover border border-slate-200"
-                  />
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-brand-600 block uppercase">
-                      {selectedEquipment.category} &bull; {selectedEquipment.id}
-                    </span>
-                    <h4 className="font-extrabold text-slate-900 text-xs leading-tight">
-                      {selectedEquipment.name}
-                    </h4>
-                    <span className="text-[11px] text-slate-500 block">
-                      Status:{' '}
-                      <span className="font-semibold text-emerald-600">
-                        {selectedEquipment.status}
+            {/* Jika Booking dari Keranjang Multi-Alat */}
+            {isCartBooking ? (
+              <div className="space-y-3">
+                {cart.map((c) => (
+                  <div key={c.cartItemId} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="w-12 h-12 rounded-lg object-cover bg-white border border-slate-200 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-brand-600 block">
+                          {c.category} &bull; {c.itemId}
+                        </span>
+                        <h4 className="font-bold text-slate-900 text-xs truncate">
+                          {c.name}
+                        </h4>
+                        <span className="text-xs font-black text-brand-700">
+                          {formatRupiah(c.itemPrice)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(c.cartItemId)}
+                        className="text-slate-400 hover:text-red-600 p-1"
+                        title="Hapus alat"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] bg-white p-2 rounded-lg border border-slate-200/60 space-y-0.5 text-slate-600">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Jadwal Ambil:</span>
+                        <span className="font-semibold text-slate-700 font-mono">
+                          {formatDateTime(c.datePickup)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Paket Durasi:</span>
+                        <span className="font-semibold text-slate-700">{c.durationText}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-100 pt-0.5">
+                        <span className="text-slate-400">Estimasi Selesai:</span>
+                        <span className="font-semibold text-slate-800 font-mono">
+                          {formatDateTime(c.estimatedReturnTime)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Total Keranjang */}
+                <div className="bg-brand-50 p-3.5 rounded-xl border border-brand-200 space-y-1.5 mt-3">
+                  <div className="flex justify-between text-xs text-brand-900">
+                    <span>Total Unit:</span>
+                    <span className="font-bold">{cart.length} Unit Alat</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-brand-900">
+                    <span>Deposit Jaminan:</span>
+                    <span className="font-semibold text-emerald-700">KTP/KTM Asli di Lokasi</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-black text-brand-900 border-t border-brand-200 pt-1.5">
+                    <span>Total Biaya Sewa:</span>
+                    <span className="text-base text-brand-700">{formatRupiah(totalPrice)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : selectedEquipment ? (
+              /* Jika Booking Tunggal dari selectedEquipment */
+              <div className="space-y-4">
+                <div id="booking-item-card" className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={selectedEquipment.image}
+                      alt={selectedEquipment.name}
+                      className="w-14 h-14 rounded-xl object-cover border border-slate-200"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold text-brand-600 block uppercase">
+                        {selectedEquipment.category} &bull; {selectedEquipment.id}
                       </span>
+                      <h4 className="font-extrabold text-slate-900 text-xs leading-tight">
+                        {selectedEquipment.name}
+                      </h4>
+                      <span className="text-[11px] text-slate-500 block">
+                        Status:{' '}
+                        <span className="font-semibold text-emerald-600">
+                          {selectedEquipment.status}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Package & Duration Selector */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="label">Pilih Paket Durasi Sewa</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      id="block-12h-btn"
+                      onClick={() => setBookingPackage('12h')}
+                      className={selectedPackage === '12h' ? activeBtnClass : inactiveBtnClass}
+                    >
+                      Blok 12 Jam
+                    </button>
+                    <button
+                      type="button"
+                      id="block-24h-btn"
+                      onClick={() => setBookingPackage('24h')}
+                      className={selectedPackage === '24h' ? activeBtnClass : inactiveBtnClass}
+                    >
+                      Blok 24 Jam
+                    </button>
+                    <button
+                      type="button"
+                      id="block-daily-btn"
+                      onClick={() => setBookingPackage('daily')}
+                      className={selectedPackage === 'daily' ? activeBtnClass : inactiveBtnClass}
+                    >
+                      Per-Hari
+                    </button>
+                  </div>
+
+                  {selectedPackage === 'daily' && (
+                    <div
+                      id="daily-counter-box"
+                      className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">Durasi Hari Sewa:</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => adjustDailyDays(-1)}
+                            className="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all"
+                          >
+                            -
+                          </button>
+                          <span id="daily-days-count" className="font-bold text-xs text-slate-900 w-12 text-center">
+                            {dailyDays} Hari
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => adjustDailyDays(1)}
+                            className="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Tarif sewa per-hari mengikuti tarif Blok 24 Jam.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Total Price Calculation Box */}
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Paket Dipilih:</span>
+                    <span id="price-duration-calc" className="font-medium text-slate-800">
+                      {durationText}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Estimasi Selesai:</span>
+                    <span id="price-estimated-return" className="font-bold text-slate-900 bg-slate-200/70 px-1.5 py-0.5 rounded text-[11px]">
+                      {estimatedReturn}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Tarif Sewa Base:</span>
+                    <span id="price-base-calc" className="font-medium">
+                      {selectedPackage === 'daily'
+                        ? `${formatRupiah(basePrice)} / hari`
+                        : formatRupiah(basePrice)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span>Deposit Jaminan:</span>
+                    <span className="font-medium text-emerald-600">KTM / KTP Asli di Tempat</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-200 pt-1.5 mt-1.5">
+                    <span>Total Estimasi:</span>
+                    <span id="price-total-calc" className="text-brand-600">
+                      {formatRupiah(totalPrice)}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-6 space-y-2">
+              <div className="text-center py-8 space-y-2">
                 <p className="text-xs text-slate-500">Belum ada alat yang dipilih.</p>
                 <button
                   type="button"
                   onClick={() => switchView('catalog')}
-                  className="btn-secondary text-xs mx-auto"
+                  className="btn-primary text-xs mx-auto"
                 >
-                  Pilih Alat di Katalog
+                  Buka Katalog Alat &rarr;
                 </button>
-              </div>
-            )}
-
-            {/* Package & Duration Selector (12 Jam, 24 Jam, & Per-Hari) */}
-            {selectedEquipment && (
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="label">Pilih Paket Durasi Sewa</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    id="block-12h-btn"
-                    onClick={() => setBookingPackage('12h')}
-                    className={selectedPackage === '12h' ? activeBtnClass : inactiveBtnClass}
-                  >
-                    Blok 12 Jam
-                  </button>
-                  <button
-                    type="button"
-                    id="block-24h-btn"
-                    onClick={() => setBookingPackage('24h')}
-                    className={selectedPackage === '24h' ? activeBtnClass : inactiveBtnClass}
-                  >
-                    Blok 24 Jam
-                  </button>
-                  <button
-                    type="button"
-                    id="block-daily-btn"
-                    onClick={() => setBookingPackage('daily')}
-                    className={selectedPackage === 'daily' ? activeBtnClass : inactiveBtnClass}
-                  >
-                    Per-Hari
-                  </button>
-                </div>
-
-                {/* Daily Days Counter (Shows when 'daily' is selected) */}
-                {selectedPackage === 'daily' && (
-                  <div
-                    id="daily-counter-box"
-                    className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">Durasi Hari Sewa:</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => adjustDailyDays(-1)}
-                          className="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all"
-                        >
-                          -
-                        </button>
-                        <span id="daily-days-count" className="font-bold text-xs text-slate-900 w-12 text-center">
-                          {dailyDays} Hari
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => adjustDailyDays(1)}
-                          className="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Tarif sewa per-hari mengikuti tarif Blok 24 Jam.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Total Price Calculation Box */}
-            {selectedEquipment && (
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Paket Dipilih:</span>
-                  <span id="price-duration-calc" className="font-medium text-slate-800">
-                    {durationText}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Estimasi Selesai:</span>
-                  <span id="price-estimated-return" className="font-bold text-slate-900 bg-slate-200/70 px-1.5 py-0.5 rounded text-[11px]">
-                    {estimatedReturn}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Tarif Sewa Base:</span>
-                  <span id="price-base-calc" className="font-medium">
-                    {selectedPackage === 'daily'
-                      ? `${formatRupiah(basePrice)} / hari`
-                      : formatRupiah(basePrice)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span>Deposit Jaminan:</span>
-                  <span className="font-medium text-emerald-600">KTM / KTP Asli di Tempat</span>
-                </div>
-                <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-200 pt-1.5 mt-1.5">
-                  <span>Total Estimasi:</span>
-                  <span id="price-total-calc" className="text-brand-600">
-                    {formatRupiah(totalPrice)}
-                  </span>
-                </div>
               </div>
             )}
           </div>

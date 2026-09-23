@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS orders (
   handoverNotes TEXT,
   returnPhoto TEXT,
   returnNotes TEXT,
+  groupCode TEXT,
+  lateFee INTEGER DEFAULT 0,
+  otherFee INTEGER DEFAULT 0,
+  otherFeeNotes TEXT,
+  totalSettlement INTEGER,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (itemId) REFERENCES inventory(id)
 );
@@ -50,6 +55,11 @@ CREATE TABLE IF NOT EXISTS orders (
 -- ALTER TABLE orders ADD COLUMN handoverNotes TEXT;
 -- ALTER TABLE orders ADD COLUMN returnPhoto TEXT;
 -- ALTER TABLE orders ADD COLUMN returnNotes TEXT;
+-- ALTER TABLE orders ADD COLUMN groupCode TEXT;
+-- ALTER TABLE orders ADD COLUMN lateFee INTEGER DEFAULT 0;
+-- ALTER TABLE orders ADD COLUMN otherFee INTEGER DEFAULT 0;
+-- ALTER TABLE orders ADD COLUMN otherFeeNotes TEXT;
+-- ALTER TABLE orders ADD COLUMN totalSettlement INTEGER;
 
 -- Indeks untuk query performa tinggi
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

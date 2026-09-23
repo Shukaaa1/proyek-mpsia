@@ -137,3 +137,112 @@ export function getProgressBadgeInfo(status) {
   }
 }
 
+/**
+ * Validasi apakah dua rentang waktu sewa bertabrakan (Anti-Double Booking)
+ */
+export function isTimeSlotOverlapping(startA, endA, startB, endB) {
+  try {
+    const sA = new Date(startA).getTime();
+    const eA = new Date(endA).getTime();
+    const sB = new Date(startB).getTime();
+    const eB = new Date(endB).getTime();
+
+    if (isNaN(sA) || isNaN(eA) || isNaN(sB) || isNaN(eB)) return false;
+    return Math.max(sA, sB) < Math.min(eA, eB);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Menghitung denda keterlambatan pengembalian unit berdasarkan aturan:
+ * - < 1 jam: Masa toleransi (Rp 0)
+ * - 1 s/d 3 jam: 30% dari tarif sewa 24 jam
+ * - > 3 s/d 6 jam: 50% dari tarif sewa harian (24 jam)
+ * - > 6 jam atau berganti hari: 100% penuh (dihitung 1 hari sewa tambahan per kelipatan 24 jam)
+ */
+export function calculateLateFee(estimatedReturnStr, actualReturnTime = null, rate24h = 0) {
+  if (!estimatedReturnStr || estimatedReturnStr === '-') {
+    return { isLate: false, lateHours: 0, lateMinutes: 0, percent: 0, fee: 0, desc: 'Tepat waktu' };
+  }
+
+  try {
+    const estTime = new Date(estimatedReturnStr.replace(' ', 'T')).getTime();
+    const actualTime = actualReturnTime
+      ? new Date(actualReturnTime).getTime()
+      : Date.now();
+
+    if (isNaN(estTime) || isNaN(actualTime)) {
+      return { isLate: false, lateHours: 0, lateMinutes: 0, percent: 0, fee: 0, desc: 'Waktu tidak valid' };
+    }
+
+    const diffMs = actualTime - estTime;
+    if (diffMs <= 0) {
+      return { isLate: false, lateHours: 0, lateMinutes: 0, percent: 0, fee: 0, desc: 'Tepat waktu (Sebelum batas selesai)' };
+    }
+
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hoursDecimal = diffMs / (1000 * 60 * 60);
+    const lateHours = Math.floor(hoursDecimal);
+    const lateMinutes = totalMinutes % 60;
+    const baseRate = Number(rate24h) || 0;
+
+    // Aturan 1: Toleransi di bawah 1 jam
+    if (hoursDecimal < 1) {
+      return {
+        isLate: true,
+        isGracePeriod: true,
+        lateHours,
+        lateMinutes,
+        percent: 0,
+        fee: 0,
+        desc: `Masa toleransi keterlambatan (${totalMinutes} menit)`
+      };
+    }
+
+    // Aturan 2: 1-3 jam -> 30% dari tarif sewa 24 jam
+    if (hoursDecimal <= 3) {
+      const fee = Math.round(baseRate * 0.3);
+      return {
+        isLate: true,
+        isGracePeriod: false,
+        lateHours,
+        lateMinutes,
+        percent: 30,
+        fee,
+        desc: `Keterlambatan 1–3 Jam (Denda 30% tarif 24 jam)`
+      };
+    }
+
+    // Aturan 3: 3-6 jam -> 50% dari tarif sewa harian
+    if (hoursDecimal <= 6) {
+      const fee = Math.round(baseRate * 0.5);
+      return {
+        isLate: true,
+        isGracePeriod: false,
+        lateHours,
+        lateMinutes,
+        percent: 50,
+        fee,
+        desc: `Keterlambatan 3–6 Jam (Denda 50% tarif harian)`
+      };
+    }
+
+    // Aturan 4: > 6 jam atau berganti hari -> 100% penuh (1 hari tambahan per kelipatan 24 jam)
+    const daysExtra = Math.max(1, Math.ceil(hoursDecimal / 24));
+    const fee = baseRate * daysExtra;
+    return {
+      isLate: true,
+      isGracePeriod: false,
+      lateHours,
+      lateMinutes,
+      percent: 100 * daysExtra,
+      fee,
+      desc: `Keterlambatan >6 Jam / Berganti Hari (Denda ${daysExtra}x hari sewa penuh)`
+    };
+  } catch {
+    return { isLate: false, lateHours: 0, lateMinutes: 0, percent: 0, fee: 0, desc: 'Perhitungan gagal' };
+  }
+}
+
+

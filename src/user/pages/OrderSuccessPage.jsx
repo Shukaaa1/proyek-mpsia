@@ -139,20 +139,52 @@ export default function OrderSuccessPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 mb-2">
-            <div>
-              <span className="text-slate-400 block text-[11px]">Item Alat:</span>
-              <span className="font-bold text-emerald-700">{order.itemName}</span>
-              <span className="text-[10px] text-slate-400 font-mono block">{order.itemId}</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Durasi &amp; Biaya:</span>
-              <span className="font-bold text-slate-800">{durasi}</span>
-              <span className="text-brand-600 font-black text-sm block">
-                {formatRupiah(order.totalPrice)}
+          {order.isGroup && order.groupItems ? (
+            <div className="border-b border-slate-200 pb-2 mb-2 space-y-2">
+              <span className="text-slate-400 block text-[11px] font-bold">
+                Daftar Peralatan Sewa ({order.groupItems.length} Unit):
               </span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {order.groupItems.map((gi) => (
+                  <div
+                    key={gi.code}
+                    className="p-2 rounded-lg bg-white border border-slate-200 flex justify-between items-center text-xs"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-800 block">{gi.itemName}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {gi.itemId} &bull; {gi.durationText}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-brand-600">
+                      {formatRupiah(gi.totalPrice)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center pt-1 text-xs">
+                <span className="font-bold text-slate-700">Total Seluruh Alat:</span>
+                <span className="font-black text-brand-700 text-sm">
+                  {formatRupiah(order.totalPrice)}
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 mb-2">
+              <div>
+                <span className="text-slate-400 block text-[11px]">Item Alat:</span>
+                <span className="font-bold text-emerald-700">{order.itemName}</span>
+                <span className="text-[10px] text-slate-400 font-mono block">{order.itemId}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">Durasi &amp; Biaya:</span>
+                <span className="font-bold text-slate-800">{durasi}</span>
+                <span className="text-brand-600 font-black text-sm block">
+                  {formatRupiah(order.totalPrice)}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <div>
