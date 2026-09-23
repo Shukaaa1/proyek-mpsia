@@ -43,6 +43,7 @@ export default function OrdersTable() {
       (o.phone || '').toLowerCase().includes(query) ||
       (o.institution || '').toLowerCase().includes(query) ||
       (o.code || '').toLowerCase().includes(query) ||
+      (o.groupCode || '').toLowerCase().includes(query) ||
       (o.itemName || '').toLowerCase().includes(query) ||
       (o.itemId || '').toLowerCase().includes(query);
 
@@ -233,7 +234,23 @@ export default function OrdersTable() {
 
                     {/* Kode Booking */}
                     <td className="p-3 font-mono font-bold text-brand-700 whitespace-nowrap">
-                      {o.code}
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => openPickupModal(o.groupCode || o.code)}
+                          className="hover:underline flex items-center gap-1.5 text-left font-mono font-bold text-brand-700 hover:text-brand-900 cursor-pointer"
+                          title="Klik untuk membuka validasi fisik & serah-terima"
+                        >
+                          <span>{o.groupCode || o.code}</span>
+                        </button>
+                        {o.groupCode && orders.filter((x) => x.groupCode === o.groupCode).length > 1 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-sans font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded-full inline-block">
+                              📦 Alat {orders.filter((x) => x.groupCode === o.groupCode).findIndex((x) => x.code === o.code) + 1} dari {orders.filter((x) => x.groupCode === o.groupCode).length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Penyewa & Kontak */}

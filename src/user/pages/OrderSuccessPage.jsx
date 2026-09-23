@@ -68,6 +68,13 @@ export default function OrderSuccessPage() {
           >
             {order.code}
           </div>
+          {order.isGroup && (
+            <div className="pt-0.5">
+              <span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                📦 Paket 1 Keranjang ({order.groupItems?.length || 2} Unit Alat)
+              </span>
+            </div>
+          )}
           <span className="text-[11px] text-slate-400 block">
             Status:{' '}
             <span className="text-yellow-400 font-semibold" id="success-status-tag">

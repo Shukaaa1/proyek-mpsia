@@ -87,7 +87,7 @@ export default function PickupModal() {
     }
   };
 
-  const currentOrder = pickupVerifyResult?.order;
+  const currentOrder = orders.find((o) => o.code === pickupVerifyResult?.order?.code) || pickupVerifyResult?.order;
 
   return (
     <>
@@ -146,11 +146,66 @@ export default function PickupModal() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {/* Multi-Item Booking Indicator & Item Selector Tabs */}
+                  {pickupVerifyResult.matchedOrders && pickupVerifyResult.matchedOrders.length > 1 && (
+                    <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 space-y-2">
+                      <div className="flex justify-between items-center text-[11px] font-bold text-amber-900">
+                        <span>📦 Paket Booking Satu Keranjang ({pickupVerifyResult.matchedOrders.length} Unit Alat):</span>
+                        <span className="font-mono text-xs">{pickupVerifyResult.sharedCode}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {pickupVerifyResult.matchedOrders.map((mo, idx) => {
+                          const liveItem = orders.find((o) => o.code === mo.code) || mo;
+                          const isSelected = currentOrder.code === liveItem.code;
+                          return (
+                            <button
+                              key={liveItem.code}
+                              type="button"
+                              onClick={() => {
+                                setPickupVerifyResult((prev) => ({ ...prev, order: liveItem }));
+                                // Reset form input checklist untuk unit ini
+                                setHandoverPhoto(null);
+                                setHandoverNotes('');
+                                setReturnPhoto(null);
+                                setReturnNotes('');
+                                setOtherFee(0);
+                                setOtherFeeNotes('');
+                                setCheckSensor(false);
+                                setCheckBody(false);
+                                setCheckAccessories(false);
+                                setCheckFunctions(false);
+                              }}
+                              className={`p-2 rounded-lg text-left text-xs transition-all border cursor-pointer ${
+                                isSelected
+                                  ? 'bg-brand-600 text-white border-brand-700 shadow-sm'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <span className="block font-bold text-[11px] truncate">
+                                #{idx + 1} {liveItem.itemName}
+                              </span>
+                              <span className={`text-[10px] font-medium block ${isSelected ? 'text-brand-100' : 'text-slate-500'}`}>
+                                {liveItem.itemId} &bull; <strong className="font-semibold">{liveItem.status}</strong>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Order Header */}
                   <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                    <span className="font-extrabold text-slate-900 text-sm">
-                      {currentOrder.code}
-                    </span>
+                    <div>
+                      <span className="font-extrabold text-slate-900 text-sm font-mono block">
+                        {currentOrder.groupCode || currentOrder.code}
+                      </span>
+                      {currentOrder.groupCode && orders.filter((x) => x.groupCode === currentOrder.groupCode).length > 1 && (
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          ID Unit: {currentOrder.code}
+                        </span>
+                      )}
+                    </div>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       currentOrder.status === 'On Rent'
                         ? 'bg-blue-100 text-blue-800'

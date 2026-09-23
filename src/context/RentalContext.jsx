@@ -494,17 +494,18 @@ export function RentalProvider({ children }) {
       }
     }
 
-    const groupHex = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const groupCode = `LAYA-GRP-${groupHex}`;
+    const bookingHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const sharedBookingCode = `LAYA-2026-${bookingHex}`;
     const newOrders = [];
 
-    cart.forEach((cartItem) => {
-      const orderHex = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const code = `LAYA-2026-${orderHex}`;
+    cart.forEach((cartItem, idx) => {
+      // In SQLite, code is PRIMARY KEY. To ensure uniqueness in DB while sharing the same booking code:
+      const uniqueDbCode = cart.length > 1 ? `${sharedBookingCode}-${idx + 1}` : sharedBookingCode;
 
       const orderObj = {
-        code,
-        groupCode,
+        code: uniqueDbCode,
+        groupCode: sharedBookingCode,
+        bookingCode: sharedBookingCode,
         customerName,
         phone,
         institution,
@@ -550,10 +551,12 @@ export function RentalProvider({ children }) {
       )
     );
 
-    // Save result for ticket
+    // Save result for ticket - unified booking code
     const primaryOrder = {
       ...newOrders[0],
-      code: newOrders.length > 1 ? groupCode : newOrders[0].code,
+      code: sharedBookingCode,
+      groupCode: sharedBookingCode,
+      bookingCode: sharedBookingCode,
       isGroup: newOrders.length > 1,
       groupItems: newOrders,
       totalPrice: newOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0)
@@ -566,7 +569,7 @@ export function RentalProvider({ children }) {
       window.location.hash = 'success';
     } catch {}
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast(`Pemesanan ${newOrders.length} alat berhasil dicatat! Kode: ${primaryOrder.code}`, 'success');
+    showToast(`Pemesanan ${newOrders.length} alat berhasil dicatat! Kode Booking: ${sharedBookingCode}`, 'success');
     return true;
   };
 
@@ -607,6 +610,8 @@ export function RentalProvider({ children }) {
 
     const newOrder = {
       code: orderCode,
+      groupCode: orderCode,
+      bookingCode: orderCode,
       customerName,
       phone,
       institution,
@@ -658,16 +663,30 @@ export function RentalProvider({ children }) {
   const sendWhatsAppReminder = () => {
     if (!lastOrderResult) return;
     const o = lastOrderResult;
-    const durasi = o.durationText || `${o.durationBlock} Jam`;
+    const bookingCode = o.bookingCode || o.groupCode || o.code;
+
+    let itemsText = '';
+    if (o.isGroup && o.groupItems && o.groupItems.length > 1) {
+      itemsText = o.groupItems
+        .map(
+          (gi, idx) =>
+            `*Alat #${idx + 1}:* ${gi.itemName} (${gi.itemId})\n` +
+            `  - Paket: ${gi.durationText}\n` +
+            `  - Tarif: Rp ${Number(gi.totalPrice || 0).toLocaleString('id-ID')}`
+        )
+        .join('\n');
+    } else {
+      itemsText = `*Item:* ${o.itemName} (${o.itemId})\n*Durasi Sewa:* ${o.durationText || `${o.durationBlock || 24} Jam`}`;
+    }
+
     const msg = encodeURIComponent(
       `Halo *Layarasa Video Rental*! Saya ingin konfirmasi serah-terima booking.\n\n` +
-      `*Kode Booking:* ${o.code}\n` +
-      `*Nama:* ${o.customerName} (${o.institution})\n` +
-      `*Item:* ${o.itemName} (${o.itemId})\n` +
-      `*Durasi Sewa:* ${durasi}\n` +
+      `*Kode Booking:* ${bookingCode}\n` +
+      `*Nama:* ${o.customerName} (${o.institution})\n\n` +
+      `*Rincian Alat:*\n${itemsText}\n\n` +
       `*Metode Bayar:* ${(o.paymentMethod || 'qris').toUpperCase()}\n` +
-      `*Total Biaya:* Rp ${Number(o.totalPrice).toLocaleString('id-ID')}\n` +
-      `*Jaminan:* KTP/KTM Asli Fisik\n\n` +
+      `*Total Biaya:* Rp ${Number(o.totalPrice || 0).toLocaleString('id-ID')}\n` +
+      `*Jaminan:* KTP/KTM Asli Fisik di Lokasi\n\n` +
       `Mohon konfirmasi kesiapan alat saat saya datang ke studio. Terima kasih!`
     );
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
@@ -678,6 +697,7 @@ export function RentalProvider({ children }) {
     const o = customOrder || lastOrderResult;
     if (!o) return false;
 
+    const bookingCode = o.bookingCode || o.groupCode || o.code;
     const durasi = o.durationText || `${o.durationBlock || 24} Jam`;
     const datePickupStr = o.datePickup ? o.datePickup.replace('T', ' ') : '-';
     const estReturnStr = o.estimatedReturnTime || '-';
@@ -708,7 +728,7 @@ export function RentalProvider({ children }) {
            LAYARASA RENTAL SINEMATOGRAFI & MULTIMEDIA
                 BUKTI RESMI TIKET & KODE BOOKING UNIK
 ================================================================
-KODE BOOKING UNIK   : ${o.code}
+KODE BOOKING UNIK   : ${bookingCode}
 STATUS PESANAN      : MENUNGGU SERAH-TERIMA FISIK (BOOKED)
 WAKTU BOOKING       : ${new Date().toLocaleString('id-ID')}
 ----------------------------------------------------------------
@@ -744,14 +764,14 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Tiket_Booking_${o.code}.txt`);
+    link.setAttribute('download', `Tiket_Booking_${bookingCode}.txt`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
     setHasDownloadedBookingCode(true);
-    showToast(`Tiket Booking ${o.code} berhasil diunduh! Silakan simpan sebagai bukti fisik.`, 'success');
+    showToast(`Tiket Booking ${bookingCode} berhasil diunduh! Silakan simpan sebagai bukti fisik.`, 'success');
     return true;
   };
 
@@ -923,14 +943,34 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
   };
 
   const verifyOrderCode = (codeToVerify) => {
-    const code = (codeToVerify || pickupVerifyCode).trim().toUpperCase();
-    if (!code) return;
+    const raw = (codeToVerify || pickupVerifyCode).trim().toUpperCase();
+    if (!raw) return;
 
-    const order = orders.find((o) => o.code === code);
-    if (order) {
-      setPickupVerifyResult({ found: true, order });
+    // Bersihkan suffix item jika ada (-1, -2) untuk pencarian grup
+    const baseCode = raw.replace(/-\d+$/, '');
+
+    // Cari semua pesanan yang cocok dengan kode item, groupCode, atau bookingCode
+    const matched = orders.filter((o) => {
+      const oCode = (o.code || '').toUpperCase();
+      const oGroup = (o.groupCode || '').toUpperCase();
+      return (
+        oCode === raw ||
+        oGroup === raw ||
+        oGroup === baseCode ||
+        oCode === baseCode ||
+        oCode.startsWith(baseCode + '-')
+      );
+    });
+
+    if (matched.length > 0) {
+      setPickupVerifyResult({
+        found: true,
+        order: matched[0],
+        matchedOrders: matched,
+        sharedCode: matched[0].groupCode || baseCode
+      });
     } else {
-      setPickupVerifyResult({ found: false, code });
+      setPickupVerifyResult({ found: false, code: raw, matchedOrders: [] });
     }
   };
 
