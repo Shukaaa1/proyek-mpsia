@@ -2,12 +2,11 @@ name = "layarasa-web"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "dist"
 
-# Konfigurasi Database Cloudflare D1
-# Di Cloudflare Pages Dashboard:
-# Project -> Settings -> Functions -> D1 database bindings:
-# Variable name: DB
-# D1 Database: layarasa-db
-[[d1_databases]]
-binding = "DB"
-database_name = "layarasa-db"
-database_id = "local-d1-id"
+# Catatan: Untuk Cloudflare Pages, binding D1 diatur langsung di Cloudflare Dashboard:
+# (Settings -> Functions -> D1 database bindings: Variable name = DB, Database = layarasa-db)
+# Blok [[d1_databases]] di bawah ini sengaja dinonaktifkan agar Cloudflare tidak error validasi UUID.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "layarasa-db"
+# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
