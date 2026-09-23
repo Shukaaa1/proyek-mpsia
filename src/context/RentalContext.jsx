@@ -2,10 +2,23 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVENTORY } from '../data/initialInventory';
 import { INITIAL_ORDERS, WHATSAPP_NUMBER } from '../data/initialOrders';
 import { calculateEstimatedReturn } from '../shared/utils/formatters';
+import {
+  checkAndInitD1,
+  fetchRemoteInventory,
+  fetchRemoteOrders,
+  createRemoteOrder,
+  updateRemoteOrderStatus,
+  deleteRemoteOrder,
+  clearRemoteOrders,
+  updateRemoteItemStatus
+} from '../shared/api';
 
 const RentalContext = createContext();
 
 export function RentalProvider({ children }) {
+  // Cloudflare D1 Connection State ('checking' | 'connected' | 'offline')
+  const [d1Status, setD1Status] = useState('checking');
+
   // Versioning key to cleanly initialize empty orders and reset phantom 'On Rent' states
   const DATA_VERSION = 'layarasa_clean_orders_v2';
 
@@ -108,6 +121,43 @@ export function RentalProvider({ children }) {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, [isAdminLoggedIn]);
+
+  // D1 Database Auto-Initialization & Remote Sync
+  const refreshFromD1 = async (showNotification = false) => {
+    try {
+      const initResult = await checkAndInitD1();
+      if (initResult.connected) {
+        setD1Status('connected');
+        const [remoteInv, remoteOrd] = await Promise.all([
+          fetchRemoteInventory(),
+          fetchRemoteOrders()
+        ]);
+        if (remoteInv && Array.isArray(remoteInv) && remoteInv.length > 0) {
+          setInventory(remoteInv);
+        }
+        if (remoteOrd && Array.isArray(remoteOrd)) {
+          setOrders(remoteOrd);
+        }
+        if (showNotification) {
+          showToast('Database Cloudflare D1 tersinkronisasi!', 'success');
+        }
+        return true;
+      } else {
+        setD1Status('offline');
+        if (showNotification) {
+          showToast('Cloudflare D1 belum aktif. Menggunakan penyimpanan lokal.', 'info');
+        }
+        return false;
+      }
+    } catch {
+      setD1Status('offline');
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    refreshFromD1(false);
+  }, []);
 
   // Sync inventory & orders to localStorage whenever updated
   useEffect(() => {
@@ -302,6 +352,9 @@ export function RentalProvider({ children }) {
       )
     );
 
+    // Sync ke Cloudflare D1 secara background
+    createRemoteOrder(newOrder);
+
     setLastOrderResult(newOrder);
     setHasDownloadedBookingCode(false);
     setActiveView('success');
@@ -483,6 +536,7 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
 
     // Preserve active orders (On Rent & Booked)
     setOrders((prev) => prev.filter((o) => o.status === 'On Rent' || o.status === 'Booked'));
+    clearRemoteOrders('completed');
     showToast(`${completedOrders.length} data histori pesanan selesai berhasil dibersihkan. Pesanan aktif tetap aman.`, 'success');
     return true;
   };
@@ -528,6 +582,8 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       });
     }
 
+    // Sync ke Cloudflare D1
+    updateRemoteItemStatus(itemId, newStatus);
     showToast(`Status aset ${itemId} disinkronkan ke ${newStatus}`, 'success');
   };
 
@@ -597,6 +653,13 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       )
     );
 
+    // Sync ke Cloudflare D1
+    updateRemoteOrderStatus(orderCode, {
+      status: newOrderStatus,
+      handoverTime: updatedHandover,
+      returnTime: updatedReturn
+    });
+
     closePickupModal();
     showToast(`Transaksi ${orderCode} berhasil diproses ke status: ${newOrderStatus}`, 'success');
   };
@@ -618,6 +681,9 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       )
     );
 
+    // Sync pembatalan ke Cloudflare D1
+    deleteRemoteOrder(orderCode);
+
     closePickupModal();
     showToast(
       `Pesanan ${orderCode} dibatalkan & dihapus. Aset ${order.itemId} kembali Available. Pendapatan total disesuaikan.`,
@@ -638,6 +704,8 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
       localStorage.setItem('layarasa_orders', JSON.stringify([]));
       localStorage.setItem('layarasa_inventory', JSON.stringify(INITIAL_INVENTORY));
     } catch {}
+    // Sync reset ke Cloudflare D1
+    clearRemoteOrders('all');
     closePickupModal();
     showToast('Daftar pemesanan berhasil dikosongkan. Seluruh inventaris kembali Available.', 'success');
   };
@@ -688,7 +756,9 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
         setHasDownloadedBookingCode,
         downloadBookingTicket,
         openOnRentModal,
-        closeOnRentModal
+        closeOnRentModal,
+        d1Status,
+        refreshFromD1
       }}
     >
       {children}

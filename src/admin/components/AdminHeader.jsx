@@ -2,18 +2,34 @@ import React from 'react';
 import { useRental } from '../../context/RentalContext';
 
 export default function AdminHeader() {
-  const { openPickupModal, logoutAdmin, switchView } = useRental();
+  const { openPickupModal, logoutAdmin, switchView, d1Status, refreshFromD1 } = useRental();
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
       <div>
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900 text-white">
             WBS Poin 4 &amp; 5 — Sistem Operasional Layarasa
           </span>
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Staf Admin Terautentikasi
           </span>
+          {d1Status === 'connected' ? (
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200"
+              title="Data tersinkronisasi terpusat di Cloudflare D1 Database"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Cloud D1 Aktif
+            </span>
+          ) : (
+            <button
+              onClick={() => refreshFromD1(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200 transition-colors"
+              title="Database D1 belum dibind atau offline. Klik untuk mencoba menghubungkan kembali."
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Penyimpanan Lokal (Klik Hubungkan D1)
+            </button>
+          )}
         </div>
         <h2 className="text-2xl font-extrabold text-slate-900">
           Dashboard Manajemen Inventaris &amp; Serah-Terima

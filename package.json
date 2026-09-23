@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
+    "pages:dev": "wrangler pages dev dist --d1 DB=layarasa-db",
+    "d1:init": "wrangler d1 execute layarasa-db --file=./schema.sql",
     "win:dev": "powershell -Command \"if (-not (Test-Path Z:)) { subst Z: $PWD }; Set-Location Z:; npx vite\"",
     "win:build": "powershell -Command \"if (-not (Test-Path Z:)) { subst Z: $PWD }; Set-Location Z:; npx vite build\""
   },

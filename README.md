@@ -91,6 +91,45 @@ Server Node.js bawaan akan menyajikan hasil build `dist/` di `http://localhost:3
 
 ---
 
+## ☁️ Panduan Deploy ke Cloudflare Pages + Cloudflare D1
+
+Sistem ini telah dilengkapi **Cloudflare Pages Functions** dan terintegrasi dengan **Cloudflare D1 Database (SQLite Serverless)**. Riwayat peminjaman dan data inventaris akan tersimpan terpusat dan sinkron di *edge* Cloudflare.
+
+### Langkah 1: Push Perubahan ke GitHub
+```bash
+git add .
+git commit -m "feat: Integrasi Cloudflare D1 Database & Pages Functions"
+git push origin main
+```
+
+### Langkah 2: Buat D1 Database di Cloudflare
+1. Buka dashboard [Cloudflare](https://dash.cloudflare.com/) -> pilih menu **Storage & Databases** -> **D1 SQL Database**.
+2. Klik tombol **Create database**.
+3. Beri nama: `layarasa-db` -> klik **Create**.
+
+### Langkah 3: Sambungkan ke Cloudflare Pages
+1. Di Cloudflare Dashboard, buka menu **Compute (Workers & Pages)** -> pilih proyek Pages Anda (atau klik *Create application* -> *Pages* -> *Connect to Git*).
+2. Konfigurasi Build:
+   - **Framework preset**: `Vite`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+   - **Root directory**: biarkan kosong (jika repo root adalah web) atau `web` (jika repo root di luar folder web).
+3. Setelah proyek dibuat, buka:
+   - **Settings** -> **Functions** -> gulir ke **D1 database bindings**.
+   - Klik **Add binding**:
+     - **Variable name**: `DB` *(WAJIB huruf kapital `DB`)*
+     - **D1 database**: pilih `layarasa-db` yang telah dibuat.
+   - Klik **Save**.
+
+### Langkah 4: Inisialisasi Database (Auto-Seed 25 Unit Alat)
+Pilih salah satu cara termudah berikut:
+- **Cara A (Melalui Web - Paling Mudah):** Buka website Anda yang sudah live di domain `*.pages.dev`, masuk ke **Portal Staf / Admin**, lalu klik tombol status database (atau buka URL `https://domain-anda.pages.dev/api/init`). Sistem akan otomatis membuat tabel SQL dan mengisi 25 unit inventaris awal!
+- **Cara B (Melalui Cloudflare D1 Console):** Di Cloudflare Dashboard -> **D1** -> `layarasa-db` -> tab **Console**, salin & tempel seluruh isi file [`schema.sql`](./schema.sql), lalu klik **Execute**.
+
+> [!TIP]
+> **Anti-Crash / Zero Drama Guarantee:** Jika binding D1 belum dikonfigurasi, sistem frontend secara otomatis beralih ke penyimpanan lokal (*LocalStorage*) dan tidak akan menyebabkan layar putih/blank screen.
+
+
 ## 🔑 Kredensial Portal Staf Admin
 
 - **Akses:** Melalui tautan **Portal Staf / Login Admin** di bagian kanan bawah footer.
