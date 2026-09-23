@@ -1,0 +1,22 @@
+{
+  "name": "layarasa-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.js",
+    "win:dev": "powershell -Command \"if (-not (Test-Path Z:)) { subst Z: $PWD }; Set-Location Z:; npx vite\"",
+    "win:build": "powershell -Command \"if (-not (Test-Path Z:)) { subst Z: $PWD }; Set-Location Z:; npx vite build\""
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Layarasa — Digitalisasi Sistem Katalog & Penyewaan Alat Produksi Video</title>
+  <meta name="description" content="Platform resmi penyewaan peralatan produksi video Layarasa. Kelola sewa kamera, lensa, lighting, audio, dan inventaris secara real-time untuk mahasiswa dan kreator." />
+  <meta name="theme-color" content="#16a34a" />
+
+  <!-- Preconnect Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind compiled stylesheet & custom styles -->
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Custom font fallback & refined adjustments */
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .hero-gradient {
+      background: linear-gradient(135deg, #052e16 0%, #065f46 55%, #059669 100%);
+    }
+    .card-glass {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+    }
+    .badge-available {
+      background-color: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .badge-booked {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+    }
+    .badge-onrent {
+      background-color: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .badge-maintenance {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+    /* Smooth tab indicator */
+    .nav-tab-active {
+      background-color: #16a34a;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    }
+    .nav-tab-inactive {
+      background-color: transparent;
+      color: #475569;
+    }
+    .nav-tab-inactive:hover {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    /* Jarak/Spasi Antar Kotak Barang (Katalog Alat & Grid) */
+    .gap-6 {
+      gap: 1.5rem;
+    }
+    .gap-x-6 {
+      column-gap: 1.5rem;
+    }
+    .gap-y-6 {
+      row-gap: 1.5rem;
+    }
+    #equipment-grid-container {
+      gap: 1.5rem; /* 24px: jarak antar kotak barang agar tidak menempel */
+    }
+    @media (min-width: 1024px) {
+      #equipment-grid-container {
+        gap: 1.75rem; /* 28px: jarak lega dan nyaman pada layar desktop/laptop */
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3 cursor-pointer" onclick="app.switchView('catalog')">
+        <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
+          L
+        </div>
+        <div>
+          <span class="font-extrabold text-lg tracking-tight text-slate-900 block leading-none">LAYARASA</span>
+          <span class="text-xs font-semibold text-brand-600 tracking-wide">Penyewaan Alat Video</span>
+        </div>
+      </div>
+
+      <!-- Main Navigation Tabs (Halaman Pelanggan) -->
+      <nav class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl" aria-label="Navigasi Utama">
+        <button id="nav-btn-catalog" onclick="app.switchView('catalog')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all nav-tab-active">
+          Katalog Alat (25)
+        </button>
+        <button id="nav-btn-booking" onclick="app.switchView('booking')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all nav-tab-inactive relative">
+          Pemesanan Saya
+          <span id="cart-badge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+        </button>
+      </nav>
+
+      <!-- Quick Action / Status -->
+      <div class="hidden md:flex items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Sistem Real-Time Online
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Banner Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1">
+
+    <!-- VIEW 1: KATALOG UTAMA (PUBLIC) -->
+    <section id="view-catalog" class="block space-y-8 pb-16">
+      <!-- Hero Banner -->
+      <div class="hero-gradient text-white py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+          <div class="space-y-4 max-w-2xl text-center md:text-left">
+            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-emerald-200 border border-white/20">
+              Solusi Digitalisasi UMKM & Kampus
+            </span>
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
+              Sewa Peralatan Video Profesional Kualitas Studio
+            </h1>
+            <p class="text-emerald-100 text-sm sm:text-base leading-relaxed">
+              Jelajahi 25 unit inventaris alat produksi video Layarasa. Cek ketersediaan otomatis 24 jam, pilih paket tarif sewa fleksibel (12 Jam, 24 Jam, atau Harian), dan selesaikan booking mandiri tanpa ribet.
+            </p>
+            <div class="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
+              <a href="#catalog-grid" class="px-5 py-2.5 rounded-xl bg-white text-emerald-800 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-lg flex items-center gap-2">
+                Lihat Katalog Alat
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </a>
+              <span class="px-4 py-2.5 rounded-xl bg-white/10 text-emerald-100 border border-white/20 text-xs font-semibold flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                Jaminan Fisik KTP/KTM Asli di Lokasi
+              </span>
+            </div>
+          </div>
+
+          <!-- Live Stats Widget -->
+          <div class="w-full md:w-auto grid grid-cols-2 gap-3 sm:gap-4 max-w-sm">
+            <div class="card-glass p-4 rounded-2xl border border-white/30 text-slate-800 shadow-xl">
+              <span class="text-xs font-semibold text-slate-500 block">Total Aset Layarasa</span>
+              <span class="text-2xl font-black text-emerald-700">25 Unit</span>
+              <span class="text-[11px] text-slate-500 block mt-1">Terawat & Siap Pakai</span>
+            </div>
+            <div class="card-glass p-4 rounded-2xl border border-white/30 text-slate-800 shadow-xl">
+              <span class="text-xs font-semibold text-slate-500 block">Skema Tarif Blok</span>
+              <span class="text-2xl font-black text-slate-900">12j / 24j</span>
+              <span class="text-[11px] text-slate-500 block mt-1">Transparan 100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters & Catalog Grid -->
+      <div id="catalog-grid" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        
+        <!-- Controls: Search & Category Filter Bar -->
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <!-- Category Tabs -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none" id="category-filters">
+            <!-- Dynamic Category Buttons populated by JS -->
+          </div>
+
+          <!-- Search Input -->
+          <div class="relative min-w-[240px]">
+            <input type="text" id="search-input" oninput="app.handleSearch(this.value)" placeholder="Cari alat (misal: Sony, Lighting, Mic)..." class="input pl-9 text-xs sm:text-sm" />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+        </div>
+
+        <!-- Product Grid -->
+        <div id="equipment-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <!-- Dynamic Equipment Cards populated by JS -->
+        </div>
+
+        <!-- Empty Filter State -->
+        <div id="catalog-empty-state" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300 p-8 space-y-3">
+          <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3 class="font-bold text-slate-800 text-base">Alat tidak ditemukan</h3>
+          <p class="text-xs text-slate-500">Coba ubah kata kunci pencarian atau pilih kategori lain.</p>
+          <button onclick="app.resetFilters()" class="btn-secondary text-xs mx-auto">Reset Filter</button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 2: FORM CHECKOUT & DETAIL PEMESANAN -->
+    <section id="view-booking" class="hidden max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div>
+          <button onclick="app.switchView('catalog')" class="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1 mb-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Kembali ke Katalog
+          </button>
+          <h2 class="text-2xl font-extrabold text-slate-900">Formulir Pemesanan & Jaminan Sewa</h2>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
+          Booking Mandiri 24/7
+        </span>
+      </div>
+
+      <div id="booking-content-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Summary Item Selected (Col 1) -->
+        <div class="md:col-span-1 space-y-4">
+          <div class="card p-5 space-y-4">
+            <h3 class="font-bold text-slate-900 text-sm border-b border-slate-100 pb-2">Item Yang Dipilih</h3>
+            <div id="booking-item-card" class="space-y-3">
+              <!-- Item detail populated by JS -->
+            </div>
+
+            <!-- Package & Duration Selector (12 Jam, 24 Jam, & Per-Hari) -->
+            <div class="space-y-2 pt-2 border-t border-slate-100">
+              <label class="label">Pilih Paket Durasi Sewa</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button type="button" id="block-12h-btn" onclick="app.setBookingPackage('12h')" class="p-2 rounded-xl border text-center transition-all border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300">
+                  Blok 12 Jam
+                </button>
+                <button type="button" id="block-24h-btn" onclick="app.setBookingPackage('24h')" class="p-2 rounded-xl border text-center transition-all border-brand-500 bg-brand-50 text-brand-800 font-bold text-xs">
+                  Blok 24 Jam
+                </button>
+                <button type="button" id="block-daily-btn" onclick="app.setBookingPackage('daily')" class="p-2 rounded-xl border text-center transition-all border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300">
+                  Per-Hari
+                </button>
+              </div>
+
+              <!-- Daily Days Counter (Shows when 'daily' is selected) -->
+              <div id="daily-counter-box" class="hidden bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 mt-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-700">Durasi Hari Sewa:</span>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="app.adjustDailyDays(-1)" class="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all">-</button>
+                    <span id="daily-days-count" class="font-bold text-xs text-slate-900 w-12 text-center">1 Hari</span>
+                    <button type="button" onclick="app.adjustDailyDays(1)" class="w-7 h-7 rounded-lg bg-white border border-slate-300 flex items-center justify-center text-slate-700 font-bold hover:bg-slate-100 active:scale-95 transition-all">+</button>
+                  </div>
+                </div>
+                <p class="text-[11px] text-slate-500">Tarif sewa per-hari mengikuti tarif Blok 24 Jam.</p>
+              </div>
+            </div>
+
+            <!-- Total Price Calculation Box -->
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+              <div class="flex justify-between text-xs text-slate-600">
+                <span>Paket Dipilih:</span>
+                <span id="price-duration-calc" class="font-medium text-slate-800">Blok 24 Jam</span>
+              </div>
+              <div class="flex justify-between text-xs text-slate-600">
+                <span>Tarif Sewa Base:</span>
+                <span id="price-base-calc" class="font-medium">Rp 0</span>
+              </div>
+              <div class="flex justify-between text-xs text-slate-600">
+                <span>Deposit Jaminan:</span>
+                <span class="font-medium text-emerald-600">KTM / KTP Asli di Tempat</span>
+              </div>
+              <div class="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-200 pt-1.5 mt-1.5">
+                <span>Total Estimasi:</span>
+                <span id="price-total-calc" class="text-brand-600">Rp 0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Input Customer & Payment (Col 2-3) -->
+        <div class="md:col-span-2 space-y-6">
+          <form id="booking-form" onsubmit="app.handleBookingSubmit(event)" class="card p-6 space-y-5">
+            <h3 class="font-bold text-slate-900 text-base border-b border-slate-100 pb-3">Informasi Penyewa & Verifikasi</h3>
+
+            <!-- Customer Details -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="cust-name" class="label">Nama Lengkap (Sesuai KTP/KTM)</label>
+                <input type="text" id="cust-name" required placeholder="Contoh: Veri Galih" class="input" />
+              </div>
+              <div>
+                <label for="cust-phone" class="label">Nomor WhatsApp Aktif</label>
+                <input type="tel" id="cust-phone" required placeholder="081234567890" class="input" />
+              </div>
+              <div>
+                <label for="cust-inst" class="label">Instansi / Universitas / Tim / Pribadi</label>
+                <input type="text" id="cust-inst" required placeholder="Contoh: Politeknik Negeri Jakarta" class="input" />
+              </div>
+              <div>
+                <label for="cust-date" class="label">Tanggal & Jam Ambil</label>
+                <input type="datetime-local" id="cust-date" required class="input" />
+              </div>
+            </div>
+
+            <!-- Guarantee Policy Banner (No KTP Upload Needed) -->
+            <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div class="text-xs space-y-1">
+                <span class="font-bold text-emerald-950 block">Jaminan Identitas Fisik di Lokasi</span>
+                <p class="text-emerald-800 leading-relaxed">
+                  Tidak perlu mengunggah foto KTP/KTM secara online. <strong>Kartu identitas asli (KTP / KTM Aktif)</strong> wajib dibawa dan diserahkan sebagai jaminan fisik saat pengambilan/serah-terima alat di studio Layarasa.
+                </p>
+              </div>
+            </div>
+
+            <!-- Payment Method Selection -->
+            <div class="space-y-2">
+              <label class="label">Metode Pembayaran</label>
+              <div class="grid grid-cols-3 gap-3">
+                <label class="border border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="payment_method" value="qris" checked class="sr-only" />
+                  <span class="font-extrabold text-xs text-slate-800">QRIS</span>
+                  <span class="text-[10px] text-slate-500">Instant Verification</span>
+                </label>
+                <label class="border border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="payment_method" value="bank" class="sr-only" />
+                  <span class="font-extrabold text-xs text-slate-800">Transfer Bank</span>
+                  <span class="text-[10px] text-slate-500">BCA / Mandiri</span>
+                </label>
+                <label class="border border-slate-200 p-3 rounded-xl flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-brand-500 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="payment_method" value="cash" class="sr-only" />
+                  <span class="font-extrabold text-xs text-slate-800">Tunai</span>
+                  <span class="text-[10px] text-slate-500">Bayar di Toko</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn-primary w-full justify-center py-3 text-sm shadow-md">
+              Konfirmasi Booking & Dapatkan Kode Unik
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: SUCCESS & UNIQUE ORDER CODE DISPLAY -->
+    <section id="view-success" class="hidden max-w-xl mx-auto px-4 py-12">
+      <div class="card p-8 text-center space-y-6 shadow-2xl border-emerald-200">
+        <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mx-auto">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </div>
+
+        <div class="space-y-2">
+          <span class="text-xs font-extrabold text-brand-600 tracking-wider uppercase">Pemesanan Berhasil Dicatat</span>
+          <h2 class="text-2xl font-black text-slate-900">Kode Booking Unik Anda</h2>
+          <p class="text-xs text-slate-600">Tunjukkan kode ini kepada petugas Layarasa di lokasi saat serah-terima alat.</p>
+        </div>
+
+        <!-- Order Code Box -->
+        <div class="bg-slate-900 text-white p-5 rounded-2xl space-y-2 relative overflow-hidden">
+          <span class="text-xs text-slate-400 block font-medium">KODE UNIQUE ORDER</span>
+          <div id="success-code-display" class="text-3xl sm:text-4xl font-black tracking-widest text-emerald-400 font-mono">
+            LAYA-2026-X9K2
+          </div>
+          <span class="text-[11px] text-slate-400 block">Status: <span class="text-yellow-400 font-semibold" id="success-status-tag">Menunggu Serah-Terima</span></span>
+        </div>
+
+        <!-- Summary Details -->
+        <div id="success-details-box" class="bg-slate-50 p-4 rounded-xl text-left text-xs space-y-2 border border-slate-200">
+          <!-- Details populated by JS -->
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button onclick="app.sendWhatsAppReminder()" class="btn-primary flex-1 justify-center bg-[#25D366] hover:bg-[#1ebd59] text-white">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-1.157 4.228 4.228-1.157z"/></svg>
+            Kirim Reminder WA
+          </button>
+          <button onclick="app.switchView('catalog')" class="btn-secondary flex-1 justify-center">
+            Kembali ke Katalog
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: ADMIN LOGIN (SEPARATED FROM CUSTOMER VIEW) -->
+    <section id="view-admin-login" class="hidden max-w-md mx-auto px-4 py-16">
+      <div class="card p-8 shadow-xl border-slate-200 space-y-6">
+        <div class="text-center space-y-2">
+          <div class="w-12 h-12 rounded-2xl bg-brand-600 text-white font-extrabold text-2xl flex items-center justify-center mx-auto shadow-md">
+            L
+          </div>
+          <h2 class="text-2xl font-black text-slate-900">Portal Login Staf Admin</h2>
+          <p class="text-xs text-slate-500">Khusus staf pengelola Layarasa untuk memvalidasi pemesanan, serah-terima fisik, dan inventaris.</p>
+        </div>
+
+        <form id="admin-login-form" onsubmit="app.handleAdminLogin(event)" class="space-y-4">
+          <div>
+            <label for="admin-user-input" class="label">Username</label>
+            <input type="text" id="admin-user-input" required autocomplete="username" placeholder="Masukkan username admin" class="input" />
+          </div>
+          <div>
+            <label for="admin-pass-input" class="label">Password</label>
+            <input type="password" id="admin-pass-input" required autocomplete="current-password" placeholder="Masukkan password" class="input" />
+          </div>
+
+          <div id="admin-login-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+            <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Username atau password salah! (Gunakan: admin / admin123)
+          </div>
+
+          <div class="pt-2 space-y-2">
+            <button type="submit" class="btn-primary w-full justify-center py-2.5 font-bold text-sm shadow-md">
+              Masuk Dashboard Admin
+            </button>
+            <button type="button" onclick="app.switchView('catalog')" class="btn-secondary w-full justify-center py-2 text-xs">
+              Kembali ke Beranda Pelanggan
+            </button>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 space-y-1">
+            <span class="font-bold text-slate-700 block">Kredensial Default Staf:</span>
+            <span>Username: <strong class="text-slate-800 font-mono">admin</strong> &bull; Password: <strong class="text-slate-800 font-mono">admin123</strong></span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- VIEW 5: ADMIN DASHBOARD (WBS POIN 4 & 5) -->
+    <section id="view-admin" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      
+      <!-- Admin Header -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900 text-white">
+              WBS Poin 4 & 5 — Sistem Operasional Layarasa
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Staf Admin Terautentikasi
+            </span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Dashboard Manajemen Inventaris & Serah-Terima</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="app.openPickupModal()" class="btn-primary text-xs flex items-center gap-1.5 shadow-md">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Validasi Serah-Terima Alat (Poin 4)
+          </button>
+          <button onclick="app.handleAdminLogout()" class="btn-secondary text-xs flex items-center gap-1.5 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors">
+            <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            Logout Admin
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-4 space-y-1">
+          <span class="text-xs font-semibold text-slate-500">Total Inventaris</span>
+          <div class="text-2xl font-black text-slate-900" id="admin-kpi-total">25 Alat</div>
+          <span class="text-[11px] text-slate-500">Kamera, Lensa, Audio, dll</span>
+        </div>
+        <div class="card p-4 space-y-1 bg-emerald-50/50 border-emerald-100">
+          <span class="text-xs font-semibold text-emerald-800">Available</span>
+          <div class="text-2xl font-black text-emerald-700" id="admin-kpi-available">0</div>
+          <span class="text-[11px] text-emerald-600">Siap disewa</span>
+        </div>
+        <div class="card p-4 space-y-1 bg-amber-50/50 border-amber-100">
+          <span class="text-xs font-semibold text-amber-800">Sedang Disewa (On Rent)</span>
+          <div class="text-2xl font-black text-amber-700" id="admin-kpi-onrent">0</div>
+          <span class="text-[11px] text-amber-600">Di tangan pelanggan</span>
+        </div>
+        <div class="card p-4 space-y-1 bg-blue-50/50 border-blue-100">
+          <span class="text-xs font-semibold text-blue-800">Pendapatan Total</span>
+          <div class="text-2xl font-black text-blue-700" id="admin-kpi-revenue">Rp 0</div>
+          <span class="text-[11px] text-blue-600">Pemesanan terverifikasi</span>
+        </div>
+      </div>
+
+      <!-- Section: Active Orders Table (Serah-Terima Poin 4) -->
+      <div class="card p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">Daftar Pemesanan & Kode Booking (Serah-Terima Physical)</h3>
+            <p class="text-xs text-slate-500">Validasi identitas penyewa, metode pembayaran, dan status transaksi di lokasi fisik.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.exportOrdersToCSV()" class="btn-secondary text-xs flex items-center gap-1.5 shadow-sm hover:bg-slate-200 transition-colors">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Download CSV Histori
+            </button>
+            <span class="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1 rounded-full" id="orders-count-badge">0 Pesanan</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500 bg-slate-50">
+                <th class="p-3">Tanggal</th>
+                <th class="p-3">Kode Booking</th>
+                <th class="p-3">Penyewa</th>
+                <th class="p-3">Kode Asset & Alat</th>
+                <th class="p-3">Durasi</th>
+                <th class="p-3">Metode Bayar</th>
+                <th class="p-3">Total Biaya</th>
+                <th class="p-3">Status</th>
+                <th class="p-3 text-right">Aksi Validasi</th>
+              </tr>
+            </thead>
+            <tbody id="admin-orders-tbody" class="divide-y divide-slate-100 text-xs">
+              <!-- Orders rows populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Section: 25 Inventory Items Management Table (WBS Poin 5) -->
+      <div class="card p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">Manajemen Status 25 Alat Inventaris Real-Time (WBS Poin 5)</h3>
+            <p class="text-xs text-slate-500">Update status alat tanpa delay: Available, Booked, On Rent, Maintenance.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="admin-filter-category" onchange="app.filterAdminInventory(this.value)" class="input py-1 text-xs">
+              <option value="all">Semua Kategori (6)</option>
+              <option value="Kamera">Kamera</option>
+              <option value="Lensa">Lensa</option>
+              <option value="Lighting">Lighting</option>
+              <option value="Tripod">Tripod & Stabilizer</option>
+              <option value="Baterai">Baterai & Power</option>
+              <option value="Audio">Audio & Mic</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500 bg-slate-50">
+                <th class="p-3">Kode Asset</th>
+                <th class="p-3">Nama Alat & Spesifikasi</th>
+                <th class="p-3">Kategori</th>
+                <th class="p-3">Tarif (12j / 24j)</th>
+                <th class="p-3">Status Saat Ini</th>
+                <th class="p-3 text-right">Ubah Status Instant</th>
+              </tr>
+            </thead>
+            <tbody id="admin-inventory-tbody" class="divide-y divide-slate-100 text-xs">
+              <!-- Inventory rows populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- MODAL 1: VALIDASI KODE BOOKING SERAH-TERIMA (POIN 4) -->
+  <div id="modal-pickup" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fade-in">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-extrabold text-slate-900 text-base">Validasi Kode Booking (Serah-Terima)</h3>
+        <button onclick="app.closePickupModal()" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <label for="input-verify-code" class="label">Masukkan / Scan Kode Booking Unik</label>
+        <div class="flex gap-2">
+          <input type="text" id="input-verify-code" placeholder="Contoh: LAYA-2026-X9K2" class="input font-mono uppercase font-bold tracking-wider" />
+          <button onclick="app.verifyOrderCode()" class="btn-primary text-xs px-4">Cari</button>
+        </div>
+      </div>
+
+      <!-- Result Verification Details Box -->
+      <div id="verify-result-box" class="hidden bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+        <!-- Verified content injected by JS -->
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="app.closePickupModal()" class="btn-secondary text-xs">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 text-slate-400 text-xs border-t border-slate-800 mt-12">
+    <!-- Main Footer Grid -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        
+        <!-- Col 1: Profil Layarasa -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-brand-600 text-white font-extrabold flex items-center justify-center text-sm shadow">
+              L
+            </div>
+            <span class="font-black text-white text-base tracking-tight">LAYARASA</span>
+          </div>
+          <p class="text-slate-400 text-xs leading-relaxed">
+            Platform digitalisasi penyewaan peralatan produksi video profesional kualitas studio. Manajemen 25 unit inventaris kamera, lensa, lighting, audio, dan stabilizer terintegrasi.
+          </p>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Booking Mandiri 24 Jam
+          </span>
+        </div>
+
+        <!-- Col 2: Alamat Studio / Workshop -->
+        <div class="space-y-3">
+          <h4 class="font-bold text-white text-xs uppercase tracking-wider">Lokasi Studio & Workshop</h4>
+          <div class="space-y-2 text-slate-300">
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-brand-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              <p class="text-xs leading-relaxed text-slate-400">
+                Jl. Prof. Dr. G.A. Siwabessy, Kampus PNJ - UI Depok, Kukusan, Kec. Beji, Kota Depok, Jawa Barat 16425
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-slate-400 pt-1">
+              <svg class="w-4 h-4 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Setiap Hari: 08.00 – 21.00 WIB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col 3: Kontak & Media Sosial -->
+        <div class="space-y-3">
+          <h4 class="font-bold text-white text-xs uppercase tracking-wider">Kontak & Media Sosial</h4>
+          <ul class="space-y-2.5">
+            <li>
+              <a href="https://wa.me/6283199103034" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 text-slate-300 hover:text-emerald-400 transition-colors">
+                <svg class="w-4 h-4 text-[#25D366] flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-1.157 4.228 4.228-1.157z"/></svg>
+                <span>+62 831-9910-3034 (WhatsApp)</span>
+              </a>
+            </li>
+            <li>
+              <a href="mailto:layarasa.official@gmail.com" class="flex items-center gap-2 text-slate-300 hover:text-emerald-400 transition-colors">
+                <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <span>layarasa.official@gmail.com</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://instagram.com/layarasa.id" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 text-slate-300 hover:text-pink-400 transition-colors">
+                <svg class="w-4 h-4 text-pink-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                <span>@layarasa.id (Instagram)</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Informasi & Akses Portal Staf -->
+        <div class="space-y-3">
+          <h4 class="font-bold text-white text-xs uppercase tracking-wider">Akses & Ketentuan</h4>
+          <ul class="space-y-2">
+            <li>
+              <a href="#catalog-grid" class="text-slate-400 hover:text-white transition-colors">Katalog Inventaris 25 Unit</a>
+            </li>
+            <li>
+              <span class="text-slate-400">Jaminan: Fisik KTP/KTM Asli di Studio</span>
+            </li>
+            <li class="pt-2 border-t border-slate-800">
+              <button onclick="app.switchView('admin')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-all font-semibold text-[11px] border border-slate-700">
+                <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                Portal Staf / Login Admin
+              </button>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Copyright Sub-bar -->
+    <div class="border-t border-slate-800/80 bg-slate-950 py-4">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500">
+        <p>&copy; 2026 Layarasa Video Rental UMKM. Sistem Informasi Akuntansi & Operasional.</p>
+        <p>Digitalisasi Sistem Rental Mandiri 24/7 &bull; Kelompok 3 (2026)</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic JS -->
+  <script src="app.js"></script>
+</body>
+</html>

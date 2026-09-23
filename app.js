@@ -57,12 +57,14 @@ const INITIAL_ORDERS = [
     institution: 'PNJ (Politeknik Negeri Jakarta)',
     itemId: 'CAM-03',
     itemName: 'Sony A7 IV Hybrid',
+    packageType: '24h',
     durationBlock: 24,
+    durationText: 'Blok 24 Jam (1 Hari)',
     totalPrice: 400000,
     paymentMethod: 'qris',
     status: 'Booked',
     datePickup: '2026-09-18T10:00',
-    idFileAttached: 'ktm_veri_galih.png'
+    guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)'
   },
   {
     code: 'LAYA-2026-B9L2',
@@ -71,12 +73,14 @@ const INITIAL_ORDERS = [
     institution: 'UKM Videografi Kampus',
     itemId: 'LNS-04',
     itemName: 'Sigma 18-35mm f/1.8 DC HSM Art',
+    packageType: '12h',
     durationBlock: 12,
+    durationText: 'Blok 12 Jam',
     totalPrice: 100000,
     paymentMethod: 'bank',
     status: 'On Rent',
     datePickup: '2026-09-17T08:00',
-    idFileAttached: 'ktp_atila_rafii.jpg'
+    guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)'
   }
 ];
 
@@ -92,10 +96,13 @@ class LayarasaApp {
     this.selectedCategory = 'all';
     this.searchQuery = '';
     
+    // Admin Auth State
+    this.isAdminLoggedIn = localStorage.getItem('layarasa_admin_auth') === 'true';
+
     // Booking Draft State
     this.selectedEquipment = null;
-    this.selectedBlock = 24; // 12 or 24
-    this.uploadedFile = null;
+    this.selectedPackage = '24h'; // '12h', '24h', 'daily'
+    this.dailyDays = 1;
     this.lastOrderResult = null;
 
     this.init();
@@ -116,15 +123,19 @@ class LayarasaApp {
     this.updateAdminKPIs();
   }
 
-  // Navigation Switcher
+  // Navigation Switcher (Customer vs Admin Login Protected)
   switchView(viewName) {
+    // Proteksi: Akses admin membutuhkan status login
+    if (viewName === 'admin' && !this.isAdminLoggedIn) {
+      viewName = 'admin-login';
+    }
+
     this.activeView = viewName;
 
-    // Update tab classes
-    ['catalog', 'booking', 'admin'].forEach(v => {
+    // Update customer navigation tab classes (halaman publik hanya katalog & pemesanan)
+    ['catalog', 'booking'].forEach(v => {
       const btn = document.getElementById(`nav-btn-${v}`);
-      const section = document.getElementById(`view-${v}`);
-      if (btn && section) {
+      if (btn) {
         if (v === viewName || (viewName === 'success' && v === 'booking')) {
           btn.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all nav-tab-active';
         } else {
@@ -133,11 +144,12 @@ class LayarasaApp {
       }
     });
 
-    // Hide all sections
-    document.getElementById('view-catalog').classList.add('hidden');
-    document.getElementById('view-booking').classList.add('hidden');
-    document.getElementById('view-success').classList.add('hidden');
-    document.getElementById('view-admin').classList.add('hidden');
+    // Hide all view sections
+    const views = ['catalog', 'booking', 'success', 'admin-login', 'admin'];
+    views.forEach(v => {
+      const sec = document.getElementById(`view-${v}`);
+      if (sec) sec.classList.add('hidden');
+    });
 
     // Show selected section
     const target = document.getElementById(`view-${viewName}`);
@@ -149,7 +161,39 @@ class LayarasaApp {
     if (viewName === 'admin') {
       this.renderAdminInventory();
       this.renderAdminOrders();
+      this.updateAdminKPIs();
     }
+  }
+
+  // Admin Authentication Handlers
+  handleAdminLogin(e) {
+    e.preventDefault();
+    const userEl = document.getElementById('admin-user-input');
+    const passEl = document.getElementById('admin-pass-input');
+    const errorEl = document.getElementById('admin-login-error');
+
+    const username = userEl ? userEl.value.trim() : '';
+    const password = passEl ? passEl.value.trim() : '';
+
+    if (username === 'admin' && password === 'admin123') {
+      this.isAdminLoggedIn = true;
+      localStorage.setItem('layarasa_admin_auth', 'true');
+      if (errorEl) errorEl.classList.add('hidden');
+      if (userEl) userEl.value = '';
+      if (passEl) passEl.value = '';
+      this.showToast('Login Admin berhasil! Selamat datang di Dashboard.', 'success');
+      this.switchView('admin');
+    } else {
+      if (errorEl) errorEl.classList.remove('hidden');
+      this.showToast('Username atau password admin salah!', 'error');
+    }
+  }
+
+  handleAdminLogout() {
+    this.isAdminLoggedIn = false;
+    localStorage.removeItem('layarasa_admin_auth');
+    this.showToast('Anda telah logout dari Portal Admin.', 'info');
+    this.switchView('catalog');
   }
 
   setupDateDefault() {
@@ -231,7 +275,7 @@ class LayarasaApp {
     }[item.status] || 'badge-available';
 
     const statusLabel = {
-      'Available': 'Ready Available',
+      'Available': 'Tersedia',
       'Booked': 'Terbooking',
       'On Rent': 'Sedang Disewa',
       'Maintenance': 'Perawatan'
@@ -320,42 +364,62 @@ class LayarasaApp {
     `;
   }
 
-  setBookingBlock(hours) {
-    this.selectedBlock = hours;
+  setBookingPackage(pkgType) {
+    this.selectedPackage = pkgType;
     const btn12 = document.getElementById('block-12h-btn');
     const btn24 = document.getElementById('block-24h-btn');
+    const btnDaily = document.getElementById('block-daily-btn');
+    const dailyBox = document.getElementById('daily-counter-box');
 
-    if (hours === 12) {
-      btn12.className = 'p-2.5 rounded-xl border text-center transition-all border-brand-500 bg-brand-50 text-brand-800 font-bold text-xs';
-      btn24.className = 'p-2.5 rounded-xl border border-slate-200 text-center transition-all hover:border-slate-300 text-slate-700 font-semibold text-xs';
-    } else {
-      btn24.className = 'p-2.5 rounded-xl border text-center transition-all border-brand-500 bg-brand-50 text-brand-800 font-bold text-xs';
-      btn12.className = 'p-2.5 rounded-xl border border-slate-200 text-center transition-all hover:border-slate-300 text-slate-700 font-semibold text-xs';
+    const activeClass = 'p-2 rounded-xl border text-center transition-all border-brand-500 bg-brand-50 text-brand-800 font-bold text-xs shadow-sm';
+    const inactiveClass = 'p-2 rounded-xl border text-center transition-all border-slate-200 text-slate-700 font-semibold text-xs hover:border-slate-300';
+
+    if (btn12) btn12.className = pkgType === '12h' ? activeClass : inactiveClass;
+    if (btn24) btn24.className = pkgType === '24h' ? activeClass : inactiveClass;
+    if (btnDaily) btnDaily.className = pkgType === 'daily' ? activeClass : inactiveClass;
+
+    if (dailyBox) {
+      if (pkgType === 'daily') {
+        dailyBox.classList.remove('hidden');
+      } else {
+        dailyBox.classList.add('hidden');
+      }
     }
 
+    this.updatePriceCalculation();
+  }
+
+  adjustDailyDays(delta) {
+    this.dailyDays = Math.max(1, Math.min(30, this.dailyDays + delta));
+    const countEl = document.getElementById('daily-days-count');
+    if (countEl) countEl.textContent = `${this.dailyDays} Hari`;
     this.updatePriceCalculation();
   }
 
   updatePriceCalculation() {
     if (!this.selectedEquipment) return;
 
-    const basePrice = this.selectedBlock === 12 ? this.selectedEquipment.rate12h : this.selectedEquipment.rate24h;
-    
-    document.getElementById('price-base-calc').textContent = `Rp ${basePrice.toLocaleString('id-ID')}`;
-    document.getElementById('price-total-calc').textContent = `Rp ${basePrice.toLocaleString('id-ID')}`;
-  }
+    let basePrice = 0;
+    let durationText = '';
 
-  handleFileSelect(input) {
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      this.uploadedFile = file.name;
-      const label = document.getElementById('file-upload-label');
-      if (label) {
-        label.textContent = `File Terpilih: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
-        label.className = 'text-xs font-bold text-emerald-700 block';
-      }
-      this.showToast('Jaminan identitas berhasil diunggah.', 'success');
+    if (this.selectedPackage === '12h') {
+      basePrice = this.selectedEquipment.rate12h;
+      durationText = 'Blok 12 Jam';
+    } else if (this.selectedPackage === '24h') {
+      basePrice = this.selectedEquipment.rate24h;
+      durationText = 'Blok 24 Jam (1 Hari)';
+    } else if (this.selectedPackage === 'daily') {
+      basePrice = this.selectedEquipment.rate24h * this.dailyDays;
+      durationText = `${this.dailyDays} Hari (${this.dailyDays * 24} Jam)`;
     }
+
+    const durationCalc = document.getElementById('price-duration-calc');
+    const baseCalc = document.getElementById('price-base-calc');
+    const totalCalc = document.getElementById('price-total-calc');
+
+    if (durationCalc) durationCalc.textContent = durationText;
+    if (baseCalc) baseCalc.textContent = `Rp ${basePrice.toLocaleString('id-ID')}`;
+    if (totalCalc) totalCalc.textContent = `Rp ${basePrice.toLocaleString('id-ID')}`;
   }
 
   handleBookingSubmit(e) {
@@ -369,7 +433,8 @@ class LayarasaApp {
     const phone = document.getElementById('cust-phone').value.trim();
     const inst = document.getElementById('cust-inst').value.trim();
     const datePickup = document.getElementById('cust-date').value;
-    const paymentMethod = document.querySelector('input[name="payment_method"]:checked').value;
+    const paymentMethodEl = document.querySelector('input[name="payment_method"]:checked');
+    const paymentMethod = paymentMethodEl ? paymentMethodEl.value : 'qris';
 
     if (!name || !phone || !inst) {
       this.showToast('Lengkapi seluruh data penyewa.', 'error');
@@ -380,7 +445,23 @@ class LayarasaApp {
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const orderCode = `LAYA-2026-${randomHex}`;
 
-    const totalPrice = this.selectedBlock === 12 ? this.selectedEquipment.rate12h : this.selectedEquipment.rate24h;
+    let totalPrice = 0;
+    let durationText = '';
+    let durationHours = 24;
+
+    if (this.selectedPackage === '12h') {
+      totalPrice = this.selectedEquipment.rate12h;
+      durationText = 'Blok 12 Jam';
+      durationHours = 12;
+    } else if (this.selectedPackage === '24h') {
+      totalPrice = this.selectedEquipment.rate24h;
+      durationText = 'Blok 24 Jam (1 Hari)';
+      durationHours = 24;
+    } else if (this.selectedPackage === 'daily') {
+      totalPrice = this.selectedEquipment.rate24h * this.dailyDays;
+      durationText = `${this.dailyDays} Hari (${this.dailyDays * 24} Jam)`;
+      durationHours = this.dailyDays * 24;
+    }
 
     const newOrder = {
       code: orderCode,
@@ -389,12 +470,15 @@ class LayarasaApp {
       institution: inst,
       itemId: this.selectedEquipment.id,
       itemName: this.selectedEquipment.name,
-      durationBlock: this.selectedBlock,
+      packageType: this.selectedPackage,
+      durationDays: this.selectedPackage === 'daily' ? this.dailyDays : (this.selectedPackage === '24h' ? 1 : 0.5),
+      durationBlock: durationHours,
+      durationText: durationText,
       totalPrice: totalPrice,
-      paymentMethod: paymentMethod,
+      paymentMethod: paymentMethod, // 'qris', 'bank', 'cash'
       status: 'Booked',
       datePickup: datePickup,
-      idFileAttached: this.uploadedFile || 'KTP_Identitas.png'
+      guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)'
     };
 
     // Save order
@@ -415,6 +499,9 @@ class LayarasaApp {
 
     // Reset Form
     document.getElementById('booking-form').reset();
+    this.selectedPackage = '24h';
+    this.dailyDays = 1;
+    this.setBookingPackage('24h');
     this.setupDateDefault();
     this.showToast(`Pemesanan berhasil! Kode Unik: ${orderCode}`, 'success');
   }
@@ -423,27 +510,45 @@ class LayarasaApp {
     document.getElementById('success-code-display').textContent = order.code;
     document.getElementById('success-status-tag').textContent = order.status;
 
+    const paymentLabel = {
+      'qris': 'QRIS (Instant)',
+      'bank': 'Transfer Bank (BCA/Mandiri)',
+      'cash': 'Tunai (Bayar di Studio)'
+    }[order.paymentMethod] || (order.paymentMethod || 'QRIS');
+
     const detailsBox = document.getElementById('success-details-box');
     if (detailsBox) {
       detailsBox.innerHTML = `
         <div class="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 mb-2">
           <div>
-            <span class="text-slate-400 block">Penyewa:</span>
+            <span class="text-slate-400 block text-[11px]">Penyewa:</span>
             <span class="font-bold text-slate-800">${order.customerName} (${order.institution})</span>
           </div>
           <div>
-            <span class="text-slate-400 block">WhatsApp:</span>
+            <span class="text-slate-400 block text-[11px]">No. WhatsApp:</span>
             <span class="font-bold text-slate-800">${order.phone}</span>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2 mb-2">
           <div>
-            <span class="text-slate-400 block">Item Alat:</span>
+            <span class="text-slate-400 block text-[11px]">Item Alat:</span>
             <span class="font-bold text-emerald-700">${order.itemName}</span>
+            <span class="text-[10px] text-slate-400 font-mono block">${order.itemId}</span>
           </div>
           <div>
-            <span class="text-slate-400 block">Durasi & Total:</span>
-            <span class="font-bold text-slate-800">Blok ${order.durationBlock} Jam (Rp ${order.totalPrice.toLocaleString('id-ID')})</span>
+            <span class="text-slate-400 block text-[11px]">Durasi & Biaya:</span>
+            <span class="font-bold text-slate-800">${order.durationText || (order.durationBlock + ' Jam')}</span>
+            <span class="text-brand-600 font-black text-sm block">Rp ${order.totalPrice.toLocaleString('id-ID')}</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[11px]">
+          <div>
+            <span class="text-slate-400 block">Metode Pembayaran:</span>
+            <span class="font-semibold text-slate-700">${paymentLabel}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block">Jaminan Serah-Terima:</span>
+            <span class="font-semibold text-emerald-700">KTP/KTM Asli di Lokasi</span>
           </div>
         </div>
       `;
@@ -453,21 +558,85 @@ class LayarasaApp {
   sendWhatsAppReminder() {
     if (!this.lastOrderResult) return;
     const o = this.lastOrderResult;
+    const durasi = o.durationText || `${o.durationBlock} Jam`;
     const msg = encodeURIComponent(
       `Halo *Layarasa Video Rental*! Saya ingin konfirmasi serah-terima booking.\n\n` +
       `*Kode Booking:* ${o.code}\n` +
-      `*Nama:* ${o.customerName}\n` +
-      `*Item:* ${o.itemName}\n` +
-      `*Durasi:* Blok ${o.durationBlock} Jam\n` +
-      `*Total Biaya:* Rp ${o.totalPrice.toLocaleString('id-ID')}\n\n` +
-      `Mohon siapkan peralatan saat saya datang ke lokasi. Terima kasih!`
+      `*Nama:* ${o.customerName} (${o.institution})\n` +
+      `*Item:* ${o.itemName} (${o.itemId})\n` +
+      `*Durasi Sewa:* ${durasi}\n` +
+      `*Metode Bayar:* ${o.paymentMethod.toUpperCase()}\n` +
+      `*Total Biaya:* Rp ${o.totalPrice.toLocaleString('id-ID')}\n` +
+      `*Jaminan:* KTP/KTM Asli Fisik\n\n` +
+      `Mohon konfirmasi kesiapan alat saat saya datang ke studio. Terima kasih!`
     );
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
   }
 
   // -------------------------------------------------------------
-  // 5. ADMIN DASHBOARD & PHYSICAL VERIFICATION (WBS POIN 4 & 5)
+  // 5. EXPORT CSV & ADMIN DASHBOARD (WBS POIN 4 & 5)
   // -------------------------------------------------------------
+  exportOrdersToCSV() {
+    if (!this.orders || this.orders.length === 0) {
+      this.showToast('Tidak ada histori pesanan untuk diekspor.', 'error');
+      return;
+    }
+
+    const headers = [
+      'Tanggal Ambil / Booking',
+      'Kode Booking',
+      'Nama Penyewa',
+      'No WhatsApp',
+      'Instansi / Kampus',
+      'Kode Asset',
+      'Nama Alat',
+      'Durasi Sewa',
+      'Metode Pembayaran',
+      'Total Biaya (Rp)',
+      'Status Pesanan',
+      'Jaminan Fisik'
+    ];
+
+    const rows = this.orders.map(o => {
+      const methodLabel = {
+        'qris': 'QRIS',
+        'bank': 'Transfer Bank',
+        'cash': 'Tunai (Cash)'
+      }[o.paymentMethod] || o.paymentMethod || 'QRIS';
+
+      const durasi = o.durationText || `${o.durationBlock || 24} Jam`;
+      const dateFormatted = o.datePickup ? o.datePickup.replace('T', ' ') : '-';
+
+      return [
+        `"${dateFormatted}"`,
+        `"${o.code}"`,
+        `"${(o.customerName || '').replace(/"/g, '""')}"`,
+        `"${(o.phone || '').replace(/"/g, '""')}"`,
+        `"${(o.institution || '').replace(/"/g, '""')}"`,
+        `"${o.itemId || ''}"`,
+        `"${(o.itemName || '').replace(/"/g, '""')}"`,
+        `"${durasi}"`,
+        `"${methodLabel}"`,
+        o.totalPrice || 0,
+        `"${o.status}"`,
+        `"${o.guaranteeType || 'KTP/KTM Asli di Lokasi'}"`
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `histori_pemesanan_layarasa_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    this.showToast('File CSV histori pemesanan berhasil diunduh!', 'success');
+  }
+
   updateAdminKPIs() {
     const total = this.inventory.length;
     const available = this.inventory.filter(i => i.status === 'Available').length;
@@ -493,22 +662,40 @@ class LayarasaApp {
     if (badge) badge.textContent = `${this.orders.length} Pesanan`;
 
     if (this.orders.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4 text-slate-400">Belum ada data pemesanan.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="text-center p-6 text-slate-400">Belum ada data pemesanan.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = this.orders.map(o => {
       const badgeClass = o.status === 'Booked' ? 'badge-booked' : (o.status === 'On Rent' ? 'badge-onrent' : 'badge-available');
+
+      const paymentBadge = {
+        'qris': '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">QRIS</span>',
+        'bank': '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Transfer</span>',
+        'cash': '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Tunai</span>'
+      }[o.paymentMethod] || `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 uppercase">${o.paymentMethod || 'QRIS'}</span>`;
+
+      const formattedDate = o.datePickup ? o.datePickup.replace('T', ' ') : '-';
+      const durasi = o.durationText || `${o.durationBlock || 24} Jam`;
+
       return `
         <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-3 text-[11px] text-slate-500 whitespace-nowrap">${formattedDate}</td>
           <td class="p-3 font-mono font-bold text-brand-700">${o.code}</td>
-          <td class="p-3 font-semibold text-slate-800">${o.customerName}<span class="block text-[10px] text-slate-400">${o.institution}</span></td>
-          <td class="p-3 font-medium text-slate-700">${o.itemName}</td>
-          <td class="p-3 text-slate-600">${o.durationBlock} Jam</td>
-          <td class="p-3 font-bold text-slate-900">Rp ${o.totalPrice.toLocaleString('id-ID')}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}">${o.status}</span></td>
-          <td class="p-3 text-right">
-            <button onclick="app.quickVerifyCode('${o.code}')" class="px-2.5 py-1 rounded bg-slate-900 text-white font-bold text-[11px] hover:bg-slate-800">
+          <td class="p-3 font-semibold text-slate-800">
+            ${o.customerName}
+            <span class="block text-[10px] text-slate-400 font-normal">${o.institution} &bull; ${o.phone}</span>
+          </td>
+          <td class="p-3">
+            <span class="font-bold text-slate-900 block">${o.itemName}</span>
+            <span class="text-[10px] font-mono text-slate-400">${o.itemId}</span>
+          </td>
+          <td class="p-3 text-slate-700 font-medium text-xs whitespace-nowrap">${durasi}</td>
+          <td class="p-3 whitespace-nowrap">${paymentBadge}</td>
+          <td class="p-3 font-bold text-slate-900 whitespace-nowrap">Rp ${o.totalPrice.toLocaleString('id-ID')}</td>
+          <td class="p-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClass}">${o.status}</span></td>
+          <td class="p-3 text-right whitespace-nowrap">
+            <button onclick="app.quickVerifyCode('${o.code}')" class="px-2.5 py-1 rounded bg-slate-900 text-white font-bold text-[11px] hover:bg-slate-800 transition-colors shadow-sm">
               Validasi Physical
             </button>
           </td>
