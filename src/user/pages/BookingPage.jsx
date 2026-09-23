@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRental } from '../../context/RentalContext';
 import { formatRupiah, calculateEstimatedReturn } from '../../shared/utils/formatters';
+import { compressImageFile } from '../../shared/utils/imageCompressor';
 
 export default function BookingPage() {
   const {
@@ -21,6 +22,11 @@ export default function BookingPage() {
   const [institution, setInstitution] = useState('');
   const [datePickup, setDatePickup] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('qris');
+
+  // Bukti Transfer State
+  const [paymentProof, setPaymentProof] = useState(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [copiedAccount, setCopiedAccount] = useState(null);
 
   // Initialize datePickup with current local time
   useEffect(() => {
@@ -56,6 +62,30 @@ export default function BookingPage() {
 
   const estimatedReturn = calculateEstimatedReturn(datePickup, durationHours);
 
+  // File upload handler dengan kompresi otomatis
+  const handleProofChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressing(true);
+      const compressed = await compressImageFile(file, 900, 900, 0.75);
+      setPaymentProof(compressed);
+      showToast('Foto bukti pembayaran berhasil diunggah & dikompresi!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Gagal memproses gambar bukti pembayaran', 'error');
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
+  const copyToClipboard = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopiedAccount(id);
+    showToast(`Nomor rekening ${text} berhasil disalin!`, 'info');
+    setTimeout(() => setCopiedAccount(null), 2500);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -65,18 +95,26 @@ export default function BookingPage() {
       return;
     }
 
+    // Constraint: Wajib unggah bukti pembayaran jika QRIS atau Transfer Bank
+    if (paymentMethod !== 'cash' && !paymentProof) {
+      showToast('Wajib mengunggah foto struk/bukti transfer untuk metode QRIS atau Transfer Bank!', 'error');
+      return;
+    }
+
     const success = createOrder({
       customerName,
       phone,
       institution,
       datePickup,
-      paymentMethod
+      paymentMethod,
+      paymentProof: paymentMethod === 'cash' ? null : paymentProof
     });
 
     if (success) {
       setCustomerName('');
       setPhone('');
       setInstitution('');
+      setPaymentProof(null);
     }
   };
 
@@ -398,6 +436,189 @@ export default function BookingPage() {
                 })}
               </div>
             </div>
+
+            {/* Panel Rincian Pembayaran & Upload Bukti Transfer */}
+            {paymentMethod === 'qris' && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span className="font-extrabold text-xs text-slate-900">Pembayaran Instan QRIS Layarasa</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                    NMID: ID1020039281923
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-3 rounded-lg border border-slate-200">
+                  <div className="w-24 h-24 bg-slate-100 rounded-lg border border-slate-300 flex items-center justify-center p-1.5 flex-shrink-0">
+                    <svg className="w-full h-full text-slate-800" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3 3h7v7H3V3zm2 2v3h3V5H5zm9-2h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5zm8-2h3v3h-3v-3zm4 0h3v3h-3v-3zm-4 4h3v3h-3v-3zm4 0h3v3h-3v-3zm-6-2h2v2h-2v-2zm4 0h2v2h-2v-2z" />
+                    </svg>
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold text-slate-800">Scan QRIS dari Mobile Banking / E-Wallet</p>
+                    <p className="text-slate-500 text-[11px] leading-relaxed">
+                      Mendukung BCA Mobile, Livin Mandiri, BRImo, BNI, GoPay, OVO, Dana, dan ShopeePay.
+                    </p>
+                    <p className="font-extrabold text-emerald-700 text-sm pt-0.5">
+                      Total Nominal: {formatRupiah(totalPrice)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Upload Struk Bukti QRIS */}
+                <div className="pt-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Unggah Bukti / Tangkapan Layar QRIS <span className="text-red-500">*Wajib</span>
+                  </label>
+                  {!paymentProof ? (
+                    <label className="border-2 border-dashed border-emerald-400 bg-emerald-50/50 hover:bg-emerald-50 rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProofChange}
+                        disabled={isCompressing}
+                        className="sr-only"
+                      />
+                      <svg className="w-7 h-7 text-emerald-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="font-bold text-xs text-emerald-950">
+                        {isCompressing ? 'Mengompresi Gambar...' : 'Klik untuk Pilih / Foto Bukti Transfer'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Mendukung Kamera HP atau Galeri (JPG, PNG)</span>
+                    </label>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-emerald-300 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={paymentProof}
+                          alt="Bukti Transfer"
+                          className="w-12 h-12 object-cover rounded-lg border border-slate-200"
+                        />
+                        <div>
+                          <span className="text-xs font-extrabold text-emerald-800 block">✓ Bukti Transfer Siap</span>
+                          <span className="text-[10px] text-slate-400">Telah terkompresi &amp; siap diverifikasi</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentProof(null)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 border border-red-200"
+                      >
+                        Hapus / Ganti
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'bank' && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span className="font-extrabold text-xs text-slate-900">Rekening Resmi Layarasa Studio</span>
+                  </div>
+                  <span className="font-extrabold text-blue-700 text-xs">
+                    Nominal: {formatRupiah(totalPrice)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Rekening BCA */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Bank BCA</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs">869-123-4567</span>
+                      <span className="text-[10px] text-slate-500 block">a.n. Layarasa Rental</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard('8691234567', 'bca')}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[11px] font-semibold text-slate-700"
+                    >
+                      {copiedAccount === 'bca' ? '✓ Disalin' : 'Salin'}
+                    </button>
+                  </div>
+
+                  {/* Rekening Mandiri */}
+                  <div className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Bank Mandiri</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs">157-00-1234567-8</span>
+                      <span className="text-[10px] text-slate-500 block">a.n. Layarasa Multimedia</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard('1570012345678', 'mandiri')}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-[11px] font-semibold text-slate-700"
+                    >
+                      {copiedAccount === 'mandiri' ? '✓ Disalin' : 'Salin'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Upload Struk Bukti Transfer */}
+                <div className="pt-1">
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Unggah Struk / Bukti Transfer Bank <span className="text-red-500">*Wajib</span>
+                  </label>
+                  {!paymentProof ? (
+                    <label className="border-2 border-dashed border-blue-400 bg-blue-50/50 hover:bg-blue-50 rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProofChange}
+                        disabled={isCompressing}
+                        className="sr-only"
+                      />
+                      <svg className="w-7 h-7 text-blue-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="font-bold text-xs text-blue-950">
+                        {isCompressing ? 'Mengompresi Gambar...' : 'Klik untuk Pilih / Foto Struk ATM/M-Banking'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Mendukung Kamera HP atau Galeri (JPG, PNG)</span>
+                    </label>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-blue-300 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={paymentProof}
+                          alt="Bukti Transfer"
+                          className="w-12 h-12 object-cover rounded-lg border border-slate-200"
+                        />
+                        <div>
+                          <span className="text-xs font-extrabold text-blue-800 block">✓ Struk Transfer Terlampir</span>
+                          <span className="text-[10px] text-slate-400">Telah terkompresi &amp; siap diverifikasi</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentProof(null)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 border border-red-200"
+                      >
+                        Hapus / Ganti
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'cash' && (
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-700 flex items-start gap-2.5 animate-fade-in">
+                <span className="text-slate-400 font-bold">ℹ️</span>
+                <p className="leading-relaxed">
+                  <strong>Pembayaran Tunai di Studio:</strong> Anda dapat membayar lunas saat mengambil alat di studio Layarasa setelah melakukan pengecekan fisik unit bersama staf. <em>Tidak perlu mengunggah bukti transfer sekarang.</em>
+                </p>
+              </div>
+            )}
 
             {/* Submit / Contact Admin Button */}
             {selectedEquipment && selectedEquipment.status !== 'Available' ? (

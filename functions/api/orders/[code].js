@@ -15,7 +15,15 @@ export async function onRequestPatch(context) {
 
   try {
     const body = await request.json();
-    const { status, handoverTime, returnTime } = body;
+    const {
+      status,
+      handoverTime,
+      returnTime,
+      handoverPhoto,
+      handoverNotes,
+      returnPhoto,
+      returnNotes
+    } = body;
 
     // Ambil order yang ada
     const order = await env.DB.prepare('SELECT * FROM orders WHERE code = ?').bind(orderCode).first();
@@ -28,14 +36,29 @@ export async function onRequestPatch(context) {
 
     const updatedHandover = handoverTime !== undefined ? handoverTime : order.handoverTime;
     const updatedReturn = returnTime !== undefined ? returnTime : order.returnTime;
+    const updatedHandoverPhoto = handoverPhoto !== undefined ? handoverPhoto : order.handoverPhoto;
+    const updatedHandoverNotes = handoverNotes !== undefined ? handoverNotes : order.handoverNotes;
+    const updatedReturnPhoto = returnPhoto !== undefined ? returnPhoto : order.returnPhoto;
+    const updatedReturnNotes = returnNotes !== undefined ? returnNotes : order.returnNotes;
     const newStatus = status || order.status;
 
     // Update order
     const updateOrder = env.DB.prepare(`
       UPDATE orders
-      SET status = ?, handoverTime = ?, returnTime = ?
+      SET status = ?, handoverTime = ?, returnTime = ?,
+          handoverPhoto = ?, handoverNotes = ?,
+          returnPhoto = ?, returnNotes = ?
       WHERE code = ?
-    `).bind(newStatus, updatedHandover, updatedReturn, orderCode);
+    `).bind(
+      newStatus,
+      updatedHandover,
+      updatedReturn,
+      updatedHandoverPhoto,
+      updatedHandoverNotes,
+      updatedReturnPhoto,
+      updatedReturnNotes,
+      orderCode
+    );
 
     // Sinkronisasi status inventaris
     let newInventoryStatus = 'Available';
@@ -56,7 +79,16 @@ export async function onRequestPatch(context) {
     return new Response(
       JSON.stringify({
         ok: true,
-        order: { ...order, status: newStatus, handoverTime: updatedHandover, returnTime: updatedReturn }
+        order: {
+          ...order,
+          status: newStatus,
+          handoverTime: updatedHandover,
+          returnTime: updatedReturn,
+          handoverPhoto: updatedHandoverPhoto,
+          handoverNotes: updatedHandoverNotes,
+          returnPhoto: updatedReturnPhoto,
+          returnNotes: updatedReturnNotes
+        }
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );

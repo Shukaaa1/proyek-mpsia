@@ -30,6 +30,9 @@ export default function OrdersTable() {
   // Delete Confirmation Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
+  // Preview Image Modal State (Bukti TF & Foto Kondisi Fisik)
+  const [previewImageModal, setPreviewImageModal] = useState(null);
+
   // Filter Orders
   const query = searchTerm.toLowerCase().trim();
   const filteredOrders = orders.filter((o) => {
@@ -269,10 +272,27 @@ export default function OrdersTable() {
                     {/* Timestamp Serah-Terima (Penyerahan) */}
                     <td className="p-3 whitespace-nowrap text-slate-700 font-mono text-[11px]">
                       {o.handoverTime ? (
-                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          {formatDateTime(o.handoverTime)}
-                        </span>
+                        <div>
+                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            {formatDateTime(o.handoverTime)}
+                          </span>
+                          {o.handoverPhoto && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewImageModal({
+                                  url: o.handoverPhoto,
+                                  title: `Foto Kondisi Serah-Terima Unit - ${o.code} (${o.customerName})`,
+                                  notes: o.handoverNotes
+                                })
+                              }
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 font-sans font-semibold transition-colors"
+                            >
+                              📸 Cek Fisik Awal
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-400 italic">Belum diserahkan</span>
                       )}
@@ -281,18 +301,58 @@ export default function OrdersTable() {
                     {/* Timestamp Pengembalian */}
                     <td className="p-3 whitespace-nowrap text-slate-700 font-mono text-[11px]">
                       {o.returnTime ? (
-                        <span className="text-blue-700 font-semibold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                          {formatDateTime(o.returnTime)}
-                        </span>
+                        <div>
+                          <span className="text-blue-700 font-semibold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            {formatDateTime(o.returnTime)}
+                          </span>
+                          {o.returnPhoto && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setPreviewImageModal({
+                                  url: o.returnPhoto,
+                                  title: `Foto Kondisi Pengembalian Unit - ${o.code} (${o.customerName})`,
+                                  notes: o.returnNotes
+                                })
+                              }
+                              className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 font-sans font-semibold transition-colors"
+                            >
+                              📸 Cek Fisik Kembali
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-slate-400 italic">Belum kembali</span>
                       )}
                     </td>
 
-                    {/* Metode Bayar */}
+                    {/* Metode Bayar & Bukti Transfer */}
                     <td className="p-3 whitespace-nowrap">
                       <span className={paymentBadge.className}>{paymentBadge.label}</span>
+                      {o.paymentProof ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewImageModal({
+                              url: o.paymentProof,
+                              title: `Bukti Pembayaran / Transfer - ${o.code} (${o.customerName})`,
+                              badge: paymentBadge.label
+                            })
+                          }
+                          className="mt-1 flex items-center gap-1 text-[10px] text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded border border-brand-200 font-semibold transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Lihat Bukti TF
+                        </button>
+                      ) : o.paymentMethod === 'cash' ? (
+                        <span className="block text-[10px] text-slate-400 mt-0.5 font-sans">Tunai di Tempat</span>
+                      ) : (
+                        <span className="block text-[10px] text-amber-600 font-medium mt-0.5 font-sans">Tanpa Bukti</span>
+                      )}
                     </td>
 
                     {/* Total Biaya */}
@@ -400,6 +460,76 @@ export default function OrdersTable() {
                 className="btn-primary text-xs bg-red-600 hover:bg-red-700 text-white"
               >
                 {!hasExportedCSV ? 'Unduh CSV & Bersihkan Histori' : 'Ya, Bersihkan Histori Selesai'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview Foto / Bukti Pembayaran */}
+      {previewImageModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setPreviewImageModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-xl w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-fade-in my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">
+                  {previewImageModal.title || 'Pratinjau Foto'}
+                </h4>
+                {previewImageModal.badge && (
+                  <span className="text-[11px] text-brand-600 font-medium">
+                    Metode: {previewImageModal.badge}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center min-h-[250px] max-h-[60vh]">
+              <img
+                src={previewImageModal.url}
+                alt={previewImageModal.title || 'Pratinjau'}
+                className="max-h-[60vh] w-auto object-contain mx-auto"
+              />
+            </div>
+
+            {previewImageModal.notes && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
+                <span className="font-bold text-slate-900 block mb-0.5">Catatan Fisik Petugas:</span>
+                {previewImageModal.notes}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <a
+                href={previewImageModal.url}
+                download="inspeksi-layarasa.jpg"
+                className="btn-secondary text-xs flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Unduh Gambar
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                className="btn-primary text-xs"
+              >
+                Tutup
               </button>
             </div>
           </div>

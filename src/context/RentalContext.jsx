@@ -311,7 +311,7 @@ export function RentalProvider({ children }) {
   const [hasExportedCSV, setHasExportedCSV] = useState(false);
 
   // Create Order with Estimated Completion & Two-way Inventory Sync
-  const createOrder = ({ customerName, phone, institution, datePickup, paymentMethod }) => {
+  const createOrder = ({ customerName, phone, institution, datePickup, paymentMethod, paymentProof = null }) => {
     if (!selectedEquipment) {
       showToast('Silakan pilih alat dari katalog terlebih dahulu.', 'error');
       return false;
@@ -363,7 +363,12 @@ export function RentalProvider({ children }) {
       estimatedReturnTime,
       handoverTime: null,
       returnTime: null,
-      guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)'
+      guaranteeType: 'KTP/KTM Asli (Fisik di Lokasi)',
+      paymentProof: paymentProof || null,
+      handoverPhoto: null,
+      handoverNotes: null,
+      returnPhoto: null,
+      returnNotes: null
     };
 
     // Update orders state
@@ -641,21 +646,29 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
   };
 
   // Physical Transition Execution with Timestamps & Inventory Synchronization
-  const executePickupTransition = (orderCode, newOrderStatus) => {
+  const executePickupTransition = (orderCode, newOrderStatus, transitionData = {}) => {
     const order = orders.find((o) => o.code === orderCode);
     if (!order) return;
 
     const nowISO = new Date().toISOString();
     let updatedHandover = order.handoverTime;
     let updatedReturn = order.returnTime;
+    let updatedHandoverPhoto = order.handoverPhoto || null;
+    let updatedHandoverNotes = order.handoverNotes || null;
+    let updatedReturnPhoto = order.returnPhoto || null;
+    let updatedReturnNotes = order.returnNotes || null;
 
     if (newOrderStatus === 'On Rent') {
       updatedHandover = updatedHandover || nowISO;
+      if (transitionData.handoverPhoto) updatedHandoverPhoto = transitionData.handoverPhoto;
+      if (transitionData.handoverNotes) updatedHandoverNotes = transitionData.handoverNotes;
     } else if (newOrderStatus === 'Returned') {
       updatedReturn = updatedReturn || nowISO;
+      if (transitionData.returnPhoto) updatedReturnPhoto = transitionData.returnPhoto;
+      if (transitionData.returnNotes) updatedReturnNotes = transitionData.returnNotes;
     }
 
-    // Update order status & timestamps
+    // Update order status & timestamps & condition photos
     setOrders((prev) =>
       prev.map((o) =>
         o.code === orderCode
@@ -663,7 +676,11 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
               ...o,
               status: newOrderStatus,
               handoverTime: updatedHandover,
-              returnTime: updatedReturn
+              returnTime: updatedReturn,
+              handoverPhoto: updatedHandoverPhoto,
+              handoverNotes: updatedHandoverNotes,
+              returnPhoto: updatedReturnPhoto,
+              returnNotes: updatedReturnNotes
             }
           : o
       )
@@ -681,7 +698,11 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
     updateRemoteOrderStatus(orderCode, {
       status: newOrderStatus,
       handoverTime: updatedHandover,
-      returnTime: updatedReturn
+      returnTime: updatedReturn,
+      handoverPhoto: updatedHandoverPhoto,
+      handoverNotes: updatedHandoverNotes,
+      returnPhoto: updatedReturnPhoto,
+      returnNotes: updatedReturnNotes
     });
 
     closePickupModal();

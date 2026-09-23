@@ -33,11 +33,23 @@ CREATE TABLE IF NOT EXISTS orders (
   datePickup TEXT NOT NULL,
   estimatedReturnTime TEXT NOT NULL,
   handoverTime TEXT,
-  returnTime TEXT,
   guaranteeType TEXT DEFAULT 'KTP/KTM Asli (Fisik di Lokasi)',
+  paymentProof TEXT,
+  handoverPhoto TEXT,
+  handoverNotes TEXT,
+  returnPhoto TEXT,
+  returnNotes TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (itemId) REFERENCES inventory(id)
 );
+
+-- Migrasi aman untuk tabel orders yang sudah ada
+-- (Abaikan jika kolom sudah ada)
+-- ALTER TABLE orders ADD COLUMN paymentProof TEXT;
+-- ALTER TABLE orders ADD COLUMN handoverPhoto TEXT;
+-- ALTER TABLE orders ADD COLUMN handoverNotes TEXT;
+-- ALTER TABLE orders ADD COLUMN returnPhoto TEXT;
+-- ALTER TABLE orders ADD COLUMN returnNotes TEXT;
 
 -- Indeks untuk query performa tinggi
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

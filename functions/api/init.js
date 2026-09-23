@@ -87,9 +87,30 @@ export async function onRequest(context) {
         handoverTime TEXT,
         returnTime TEXT,
         guaranteeType TEXT DEFAULT 'KTP/KTM Asli (Fisik di Lokasi)',
+        paymentProof TEXT,
+        handoverPhoto TEXT,
+        handoverNotes TEXT,
+        returnPhoto TEXT,
+        returnNotes TEXT,
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `).run();
+
+    // Migrasi aman untuk menambahkan kolom baru jika tabel orders sudah terbuat sebelumnya
+    const columnsToEnsure = [
+      'ALTER TABLE orders ADD COLUMN paymentProof TEXT',
+      'ALTER TABLE orders ADD COLUMN handoverPhoto TEXT',
+      'ALTER TABLE orders ADD COLUMN handoverNotes TEXT',
+      'ALTER TABLE orders ADD COLUMN returnPhoto TEXT',
+      'ALTER TABLE orders ADD COLUMN returnNotes TEXT'
+    ];
+    for (const sql of columnsToEnsure) {
+      try {
+        await env.DB.prepare(sql).run();
+      } catch {
+        // Kolom sudah ada, abaikan
+      }
+    }
 
     // 3. Buat indeks performa
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)').run();

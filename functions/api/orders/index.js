@@ -58,7 +58,12 @@ export async function onRequestPost(context) {
       estimatedReturnTime,
       handoverTime = null,
       returnTime = null,
-      guaranteeType = 'KTP/KTM Asli (Fisik di Lokasi)'
+      guaranteeType = 'KTP/KTM Asli (Fisik di Lokasi)',
+      paymentProof = null,
+      handoverPhoto = null,
+      handoverNotes = null,
+      returnPhoto = null,
+      returnNotes = null
     } = body;
 
     if (!code || !customerName || !itemId) {
@@ -74,8 +79,9 @@ export async function onRequestPost(context) {
         code, customerName, phone, institution, itemId, itemName,
         packageType, durationDays, durationBlock, durationText, totalPrice,
         paymentMethod, status, datePickup, estimatedReturnTime, handoverTime,
-        returnTime, guaranteeType
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        returnTime, guaranteeType, paymentProof, handoverPhoto, handoverNotes,
+        returnPhoto, returnNotes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       code,
       customerName,
@@ -94,7 +100,12 @@ export async function onRequestPost(context) {
       estimatedReturnTime,
       handoverTime,
       returnTime,
-      guaranteeType
+      guaranteeType,
+      paymentProof,
+      handoverPhoto,
+      handoverNotes,
+      returnPhoto,
+      returnNotes
     );
 
     const updateInventory = env.DB.prepare(
