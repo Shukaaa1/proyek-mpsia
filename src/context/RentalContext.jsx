@@ -157,6 +157,30 @@ export function RentalProvider({ children }) {
 
   useEffect(() => {
     refreshFromD1(false);
+
+    // Auto-sync polling setiap 8 detik agar HP dan Laptop selalu sinkron otomatis
+    const interval = setInterval(() => {
+      refreshFromD1(false);
+    }, 8000);
+
+    const handleFocus = () => {
+      refreshFromD1(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFromD1(false);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Sync inventory & orders to localStorage whenever updated

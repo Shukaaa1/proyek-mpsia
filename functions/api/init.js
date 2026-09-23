@@ -51,8 +51,8 @@ export async function onRequest(context) {
   }
 
   try {
-    // 1. Buat tabel jika belum ada
-    await env.DB.exec(`
+    // 1. Buat tabel inventory jika belum ada
+    await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS inventory (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -63,8 +63,11 @@ export async function onRequest(context) {
         image TEXT NOT NULL,
         desc TEXT,
         updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
-      );
+      )
+    `).run();
 
+    // 2. Buat tabel orders jika belum ada
+    await env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS orders (
         code TEXT PRIMARY KEY,
         customerName TEXT NOT NULL,
@@ -85,15 +88,16 @@ export async function onRequest(context) {
         returnTime TEXT,
         guaranteeType TEXT DEFAULT 'KTP/KTM Asli (Fisik di Lokasi)',
         createdAt TEXT DEFAULT CURRENT_TIMESTAMP
-      );
+      )
+    `).run();
 
-      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-      CREATE INDEX IF NOT EXISTS idx_orders_itemId ON orders(itemId);
-      CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt DESC);
-      CREATE INDEX IF NOT EXISTS idx_inventory_status ON inventory(status);
-    `);
+    // 3. Buat indeks performa
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)').run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_itemId ON orders(itemId)').run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt DESC)').run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_inventory_status ON inventory(status)').run();
 
-    // 2. Cek apakah inventory sudah terisi
+    // 4. Cek apakah inventory sudah terisi
     const countRes = await env.DB.prepare('SELECT count(*) as total FROM inventory').first();
     let seeded = false;
 
