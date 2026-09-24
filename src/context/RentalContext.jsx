@@ -1117,6 +1117,7 @@ Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.
         isPickupModalOpen,
         pickupVerifyCode,
         pickupVerifyResult,
+        setPickupVerifyResult,
         onRentNoticeItem,
         hasExportedCSV,
         showToast,

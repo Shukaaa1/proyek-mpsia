@@ -11,10 +11,12 @@ export default function PickupModal() {
     setPickupVerifyCode,
     verifyOrderCode,
     pickupVerifyResult,
+    setPickupVerifyResult,
     executePickupTransition,
     cancelOrDeleteOrder,
     showToast,
-    inventory
+    inventory,
+    orders
   } = useRental();
 
   // Condition Checklist State
@@ -87,7 +89,8 @@ export default function PickupModal() {
     }
   };
 
-  const currentOrder = orders.find((o) => o.code === pickupVerifyResult?.order?.code) || pickupVerifyResult?.order;
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const currentOrder = safeOrders.find((o) => o.code === pickupVerifyResult?.order?.code) || pickupVerifyResult?.order;
 
   return (
     <>
@@ -155,7 +158,7 @@ export default function PickupModal() {
                       </div>
                       <div className="grid grid-cols-2 gap-1.5">
                         {pickupVerifyResult.matchedOrders.map((mo, idx) => {
-                          const liveItem = orders.find((o) => o.code === mo.code) || mo;
+                          const liveItem = safeOrders.find((o) => o.code === mo.code) || mo;
                           const isSelected = currentOrder.code === liveItem.code;
                           return (
                             <button
@@ -200,7 +203,7 @@ export default function PickupModal() {
                       <span className="font-extrabold text-slate-900 text-sm font-mono block">
                         {currentOrder.groupCode || currentOrder.code}
                       </span>
-                      {currentOrder.groupCode && orders.filter((x) => x.groupCode === currentOrder.groupCode).length > 1 && (
+                      {currentOrder.groupCode && safeOrders.filter((x) => x.groupCode === currentOrder.groupCode).length > 1 && (
                         <span className="text-[10px] text-slate-400 font-mono">
                           ID Unit: {currentOrder.code}
                         </span>
