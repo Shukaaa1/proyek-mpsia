@@ -753,8 +753,8 @@ SYARAT & KETENTUAN PENGAMBILAN UNIT DI LOKASI:
    - > 6 jam / berganti hari: 100% penuh per hari tambahan.
 ----------------------------------------------------------------
 KONTAK & LOKASI STUDIO:
-WhatsApp Hotline    : +62 831-9910-3034
-Alamat Studio       : Jl. Sinema Kreatif No. 12, Jakarta Selatan
+WhatsApp Hotline    : +62 812-3456-7890 (Customer Service)
+Alamat Studio       : Jl. Kalimongso, Jurang Mangu Timur, Tangerang Selatan
 Website             : Layarasa System Rental
 ================================================================
 Harap simpan file ini dengan baik sebagai bukti pemesanan yang sah.

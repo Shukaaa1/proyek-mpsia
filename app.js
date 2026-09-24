@@ -7,7 +7,8 @@
 // -------------------------------------------------------------
 // 1. DATA INITIALIZATION: 25 INVENTORY ASSETS (LAYARASA)
 // -------------------------------------------------------------
-const WHATSAPP_NUMBER = '6283199103034';
+// Nomor WhatsApp Official Layarasa Hotline (Placeholder aman untuk publikasi GitHub)
+const WHATSAPP_NUMBER = '6281234567890';
 
 const INITIAL_INVENTORY = [
   // KAMERA (5 items)

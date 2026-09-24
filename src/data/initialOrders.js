@@ -1,3 +1,4 @@
 export const INITIAL_ORDERS = [];
 
-export const WHATSAPP_NUMBER = '6283199103034';
+// Nomor WhatsApp Official Layarasa Hotline (Placeholder aman untuk publikasi GitHub)
+export const WHATSAPP_NUMBER = '6281234567890';
